@@ -47,6 +47,7 @@ if (Test-Path $ProjectPath) {
         -p:IncludeNativeLibrariesForSelfExtract=true `
         -p:DebugType=none `
         -p:DebugSymbols=false `
+        -p:DebuggerSupport=false `
         -o "$PublishDir"
 
     if ($LASTEXITCODE -eq 0) {
