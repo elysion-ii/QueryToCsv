@@ -1,6 +1,6 @@
 ; QueryToCsv Installer Script
 #define MyAppName "QueryToCsv"
-#define MyAppVersion "1.4.0"
+#define MyAppVersion "1.4.1"
 #define MyAppExeName "QueryToCsv.exe"
 
 [Setup]
@@ -32,60 +32,59 @@ Source: "QueryToCsv\appsettings.json"; DestDir: "{app}"; Flags: onlyifdoesntexis
 Name: "{app}\queries"
 Name: "{app}\output"
 
-[Registry]
-Root: HKCU; Subkey: "Environment"; \
-    ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; \
-    Check: NeedsAddPath('{app}'); Tasks: addtopath
-
 [Code]
-function NeedsAddPath(Param: string): Boolean;
+// Rewrite the user PATH: remove every entry equal to TargetPath (case-insensitive),
+// then optionally append a single fresh entry at the end.
+procedure UpdateUserPath(TargetPath: string; AddEntry: Boolean);
 var
   OrigPath: string;
+  TargetUpper: string;
+  Remaining: string;
+  Entry: string;
+  Rebuilt: string;
+  SemiPos: Integer;
 begin
-  if not RegQueryStringValue(HKEY_CURRENT_USER,
-    'Environment',
-    'Path', OrigPath)
-  then begin
-    Result := True;
-    exit;
+  if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', OrigPath) then
+    OrigPath := '';
+
+  TargetUpper := Uppercase(TargetPath);
+  Remaining := OrigPath;
+  Rebuilt := '';
+
+  while Length(Remaining) > 0 do begin
+    SemiPos := Pos(';', Remaining);
+    if SemiPos > 0 then begin
+      Entry := Copy(Remaining, 1, SemiPos - 1);
+      Remaining := Copy(Remaining, SemiPos + 1, MaxInt);
+    end else begin
+      Entry := Remaining;
+      Remaining := '';
+    end;
+
+    if (Entry <> '') and (Uppercase(Entry) <> TargetUpper) then begin
+      if Rebuilt <> '' then
+        Rebuilt := Rebuilt + ';';
+      Rebuilt := Rebuilt + Entry;
+    end;
   end;
-  Result := Pos(';' + Uppercase(Param) + ';', ';' + Uppercase(OrigPath) + ';') = 0;
+
+  if AddEntry then begin
+    if Rebuilt <> '' then
+      Rebuilt := Rebuilt + ';';
+    Rebuilt := Rebuilt + TargetPath;
+  end;
+
+  RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Rebuilt);
 end;
 
-procedure RemovePath(Param: string);
-var
-  OrigPath: string;
-  NewPath: string;
-  SearchStr: string;
-  P: Integer;
+procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  if not RegQueryStringValue(HKEY_CURRENT_USER,
-    'Environment',
-    'Path', OrigPath)
-  then
-    exit;
-
-  SearchStr := ';' + Uppercase(Param);
-  P := Pos(SearchStr, ';' + Uppercase(OrigPath));
-  if P = 0 then
-    exit;
-
-  // Remove the entry (adjust P for the leading ';' we prepended)
-  NewPath := Copy(OrigPath, 1, P - 1) + Copy(OrigPath, P + Length(Param) + 1, MaxInt);
-
-  // Clean up leading/trailing semicolons
-  if (Length(NewPath) > 0) and (NewPath[1] = ';') then
-    NewPath := Copy(NewPath, 2, MaxInt);
-  if (Length(NewPath) > 0) and (NewPath[Length(NewPath)] = ';') then
-    NewPath := Copy(NewPath, 1, Length(NewPath) - 1);
-
-  RegWriteStringValue(HKEY_CURRENT_USER,
-    'Environment',
-    'Path', NewPath);
+  if (CurStep = ssPostInstall) and WizardIsTaskSelected('addtopath') then
+    UpdateUserPath(ExpandConstant('{app}'), True);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
-    RemovePath(ExpandConstant('{app}'));
+    UpdateUserPath(ExpandConstant('{app}'), False);
 end;
