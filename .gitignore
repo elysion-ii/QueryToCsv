@@ -1,44 +1,44 @@
-# Build results
-[Bb]in/
-[Oo]bj/
-[Dd]ebug/
-[Rr]elease/
+## .NET
+bin/
+obj/
+publish/
 
-# Build script outputs
-Build/QueryToCsv/
-Build/publish_temp/
-Build/Installer/
+## Build output
+build/QueryToCsv/
+build/Installer/
+build/publish_temp*/
 
-# User settings
+## IDE
+.vs/
 *.user
 *.suo
 *.userprefs
+*.sln.docstates
+*.rsuser
 *.DotSettings.user
+launchSettings.json
 
-# appsettings (contains connection strings)
-appsettings.json
+## Rider
+.idea/
 
-# CSV output
-output/
+## VS Code
+.vscode/
 
-# NuGet
+## NuGet
 *.nupkg
 **/[Pp]ackages/*
 !**/[Pp]ackages/build/
 
-# Visual Studio
-.vs/
-*.rsuser
-launchSettings.json
+## Working area
+docs/plans/
+docs/archive/plans/
 
-# Rider
-.idea/
-
-# OS files
+## OS
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 .DS_Store
 
-# Plans
-plans/
+## Runtime files produced or edited by the user next to the executable
+appsettings.json
+output/

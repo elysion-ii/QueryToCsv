@@ -1,6 +1,5 @@
 @echo off
 setlocal
-chcp 65001 > nul
 
 :menu
 cls
@@ -8,22 +7,22 @@ echo ================================================
 echo   QueryToCsv Build Menu
 echo ================================================
 echo.
-echo   1. Build
-echo   2. Create Installer
-echo   3. Build + Create Installer
+echo   1. Build                        (net10.0)
+echo   2. Installer                    (1 required)
+echo   3. Full Build                   (1-2 sequential)
 echo.
-echo   4. Exit
+echo   9. Exit
 echo.
 echo ================================================
 echo.
 
 set "choice="
-set /p choice="Select option (1-4): "
+set /p choice="Select option (1-9): "
 
 if "%choice%"=="1" goto build
 if "%choice%"=="2" goto installer
 if "%choice%"=="3" goto full_build
-if "%choice%"=="4" goto exit
+if "%choice%"=="9" goto exit
 echo.
 echo [ERROR] Invalid selection
 timeout /t 2 > nul
@@ -38,33 +37,23 @@ echo.
 powershell -ExecutionPolicy Bypass -File "%~dp0Build.ps1"
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo [ERROR] Build failed
+    echo [ERROR] QueryToCsv build failed
     pause
     goto menu
 )
 echo.
-echo [SUCCESS] Build completed
-echo Output: Build\QueryToCsv\
+echo [SUCCESS] QueryToCsv build completed
+echo Output: build\QueryToCsv\
 pause
 goto menu
 
 :installer
 echo.
-if not exist "%~dp0QueryToCsv\QueryToCsv.exe" (
-    echo [ERROR] Build artifacts not found. Run Build first.
-    pause
-    goto menu
-)
-if not exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
-    echo [ERROR] Inno Setup 6 not found. Please install it first.
-    pause
-    goto menu
-)
 echo ================================================
 echo   Creating Installer...
 echo ================================================
 echo.
-"%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" "%~dp0Setup.iss"
+powershell -ExecutionPolicy Bypass -File "%~dp0Installer.ps1"
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo [ERROR] Installer creation failed
@@ -73,14 +62,13 @@ if %ERRORLEVEL% NEQ 0 (
 )
 echo.
 echo [SUCCESS] Installer created
-echo Output: Build\Installer\
 pause
 goto menu
 
 :full_build
 echo.
 echo ================================================
-echo   Full Build: Build + Create Installer
+echo   Full Build: Build + Installer
 echo ================================================
 echo.
 
@@ -89,22 +77,17 @@ echo.
 powershell -ExecutionPolicy Bypass -File "%~dp0Build.ps1"
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo [ERROR] Build failed
+    echo [ERROR] QueryToCsv build failed
     pause
     goto menu
 )
 echo.
-echo [SUCCESS] Build completed
+echo [SUCCESS] QueryToCsv build completed
 echo.
 
-if not exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
-    echo [ERROR] Inno Setup 6 not found. Please install it first.
-    pause
-    goto menu
-)
 echo [2/2] Creating Installer...
 echo.
-"%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" "%~dp0Setup.iss"
+powershell -ExecutionPolicy Bypass -File "%~dp0Installer.ps1"
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo [ERROR] Installer creation failed
@@ -117,8 +100,8 @@ echo ================================================
 echo   Full Build Completed
 echo ================================================
 echo.
-echo [SUCCESS] All tasks completed
-echo Output: Build\Installer\
+echo [SUCCESS] All build and installer tasks completed
+echo Output: build\Installer\
 pause
 goto menu
 

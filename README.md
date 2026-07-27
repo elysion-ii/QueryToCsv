@@ -33,7 +33,7 @@ Pre-built binaries are available on the [Releases](https://github.com/luxon-45/Q
 
 ### 1. Build (from source)
 
-Run `Build/Menu.bat` and select **Build** from the menu. This produces a self-contained executable in `Build/QueryToCsv/`.
+Run `build/Menu.bat` and select **Build** from the menu. This produces a self-contained executable in `build/QueryToCsv/`. The build runs a code format check and the test suite first, and stops if either fails.
 
 Alternatively, build directly:
 
@@ -326,8 +326,8 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php).
 
-1. Run `Build/Menu.bat`
-2. Select **Build + Create Installer**
+1. Run `build/Menu.bat`
+2. Select **Full Build**
 
 The installer:
 - Installs to `%LOCALAPPDATA%\Programs\QueryToCsv` (per-user, no admin required)

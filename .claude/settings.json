@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '%s\\n\\n' 'MANDATORY: Before you answer, plan, or run any other tool this session, read EVERY file below IN FULL using your file-reading tool. Do not do anything else until all are read:'; find docs/rules -type f 2>/dev/null | sort",
+            "statusMessage": "Loading project rules"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "in=$(cat); if printf '%s' \"$in\" | grep -Eq 'git[^A-Za-z]{1,4}commit' && ! printf '%s' \"$in\" | grep -q 'audit\\.ok=true'; then printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"AUDIT not confirmed. Run the AUDIT procedure in docs/rules and fix issues; if already complete, re-run with: git -c audit.ok=true commit\"}}'; fi",
+            "statusMessage": "Audit gate"
+          }
+        ]
+      }
+    ]
+  }
+}
