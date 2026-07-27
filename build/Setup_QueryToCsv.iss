@@ -1,6 +1,10 @@
 ; QueryToCsv Installer Script
+; MyAppVersion is injected by Installer.ps1 (/D) from Directory.Build.props <Version>.
+; Never hardcode a version here — Directory.Build.props is the single source of truth.
+#ifndef MyAppVersion
+  #error MyAppVersion is not defined. Build via Installer.ps1, which injects it from Directory.Build.props.
+#endif
 #define MyAppName "QueryToCsv"
-#define MyAppVersion "1.4.1"
 #define MyAppExeName "QueryToCsv.exe"
 
 [Setup]

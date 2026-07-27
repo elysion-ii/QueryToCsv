@@ -80,16 +80,18 @@ public static partial class QueryExecutor
         }
     }
 
-    private static bool IsSelectOnly(string sql)
+    internal static bool IsSelectOnly(string sql)
     {
         var stripped = CommentsAndStringsRegex().Replace(sql, " ");
         return !ProhibitedKeywordsRegex().IsMatch(stripped);
     }
 
     private static string BuildOutputPath(AppSettings settings, string? baseName)
+        => BuildOutputPath(settings.OutputFolder, baseName, DateTime.Now);
+
+    internal static string BuildOutputPath(string outputDir, string? baseName, DateTime timestampSource)
     {
-        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        var outputDir = settings.OutputFolder;
+        var timestamp = timestampSource.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
 
         var prefix = string.IsNullOrEmpty(baseName) ? timestamp : $"{baseName}_{timestamp}";
 

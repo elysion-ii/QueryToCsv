@@ -1,0 +1,30 @@
+<Project>
+  <!-- Build settings shared by every project in this repository.
+       Project-specific settings belong in each .csproj. -->
+  <PropertyGroup>
+    <!-- Single source of truth for the app version. Do not define <Version>
+         anywhere else; Installer.ps1 reads this value and injects it into the
+         Inno Setup script, and checks CHANGELOG.md (if present) for an entry. -->
+    <Version>1.4.1</Version>
+
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Static analysis: built-in Roslyn analyzers + .editorconfig style rules -->
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Warnings are build errors. Never turn this off; relax individual
+         diagnostics at the narrowest scope with a reason
+         (see docs/rules/dotnet.md, ANALYZERS). -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- VSTHRD analyzers enforce the async rules mechanically (e.g. VSTHRD002:
+         no .Result/.Wait() blocking on async code). See docs/rules/dotnet.md,
+         ASYNC. -->
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.*" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

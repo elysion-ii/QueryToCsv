@@ -13,9 +13,12 @@ if (args.Length >= 1 && (args[0] == "-h" || args[0] == "--help"))
 if (args.Length >= 2 && args[0] == "--open")
     return HandleOpen(args[1]);
 
-var (runArgs, parseExitCode) = ParseRunArgs(args);
-if (parseExitCode is not null)
-    return parseExitCode.Value;
+var (runArgs, parseError) = CliRunArgs.Parse(args);
+if (parseError is not null)
+{
+    Console.Error.WriteLine(parseError);
+    return 1;
+}
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
@@ -113,80 +116,6 @@ catch (Exception ex)
 finally
 {
     LogManager.Shutdown();
-}
-
-static (CliRunArgs? RunArgs, int? ExitCode) ParseRunArgs(string[] args)
-{
-    if (args.Length == 0)
-        return (null, null);
-
-    string? connectionName = null;
-    string? inlineQuery = null;
-    string? sqlFile = null;
-    string encodingName = "utf-8";
-    var includeHeader = true;
-
-    for (var i = 0; i < args.Length; i++)
-    {
-        switch (args[i])
-        {
-            case "-c" or "--connection":
-                if (i + 1 >= args.Length)
-                {
-                    Console.Error.WriteLine($"Error: {args[i]} requires a value.");
-                    return (null, 1);
-                }
-                connectionName = args[++i];
-                break;
-            case "-q" or "--query":
-                if (i + 1 >= args.Length)
-                {
-                    Console.Error.WriteLine($"Error: {args[i]} requires a value.");
-                    return (null, 1);
-                }
-                inlineQuery = args[++i];
-                break;
-            case "-f" or "--file":
-                if (i + 1 >= args.Length)
-                {
-                    Console.Error.WriteLine($"Error: {args[i]} requires a value.");
-                    return (null, 1);
-                }
-                sqlFile = args[++i];
-                break;
-            case "-e" or "--encoding":
-                if (i + 1 >= args.Length)
-                {
-                    Console.Error.WriteLine($"Error: {args[i]} requires a value.");
-                    return (null, 1);
-                }
-                encodingName = args[++i];
-                break;
-            case "--header":
-                includeHeader = true;
-                break;
-            case "--no-header":
-                includeHeader = false;
-                break;
-            default:
-                Console.Error.WriteLine($"Error: Unknown option: {args[i]}");
-                return (null, 1);
-        }
-    }
-
-    if (inlineQuery is not null && sqlFile is not null)
-    {
-        Console.Error.WriteLine("Error: -q and -f cannot be used together.");
-        return (null, 1);
-    }
-
-    if (inlineQuery is null && sqlFile is null)
-    {
-        Console.Error.WriteLine("Error: -q or -f is required when using CLI options.");
-        return (null, 1);
-    }
-
-    return (new CliRunArgs(connectionName, inlineQuery, sqlFile, encodingName, includeHeader), null);
 }
 
 static int RunOneLiner(AppSettings settings, CliRunArgs runArgs, Logger logger)
@@ -300,33 +229,33 @@ static int PrintHelp()
 static int HandleOpen(string target)
 {
     var baseDir = AppContext.BaseDirectory;
+    var normalizedTarget = target.ToLowerInvariant();
 
     string path;
     bool isFile;
 
-    switch (target.ToLowerInvariant())
+    switch (normalizedTarget)
     {
         case "queries":
         case "output":
-        {
-            var settings = AppSettings.Load();
-            if (settings is null)
-                return 1;
-
-            path = target.ToLowerInvariant() == "queries"
-                ? settings.QueryFolder
-                : settings.OutputFolder;
-
-            if (string.IsNullOrWhiteSpace(path))
             {
-                var key = target.ToLowerInvariant() == "queries" ? "QueryFolder" : "OutputFolder";
-                Console.Error.WriteLine($"Error: {key} is not configured in appsettings.json.");
-                return 1;
-            }
+                var settings = AppSettings.Load();
+                if (settings is null)
+                    return 1;
 
-            isFile = false;
-            break;
-        }
+                var isQueries = normalizedTarget is "queries";
+                path = isQueries ? settings.QueryFolder : settings.OutputFolder;
+
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    var key = isQueries ? "QueryFolder" : "OutputFolder";
+                    Console.Error.WriteLine($"Error: {key} is not configured in appsettings.json.");
+                    return 1;
+                }
+
+                isFile = false;
+                break;
+            }
         case "config":
             path = Path.Combine(baseDir, "appsettings.json");
             isFile = true;
@@ -354,7 +283,7 @@ static int HandleOpen(string target)
     {
         if (!Directory.Exists(path))
         {
-            var msg = target.ToLowerInvariant() == "output"
+            var msg = normalizedTarget is "output"
                 ? "Error: Output folder does not exist yet. Run a query first to create it."
                 : $"Error: Folder not found: {path}";
             Console.Error.WriteLine(msg);
@@ -389,5 +318,3 @@ static Logger ConfigureNLog(int maxArchiveDays)
     LogManager.Configuration = config;
     return LogManager.GetCurrentClassLogger();
 }
-
-record CliRunArgs(string? ConnectionName, string? InlineQuery, string? SqlFile, string EncodingName, bool IncludeHeader);

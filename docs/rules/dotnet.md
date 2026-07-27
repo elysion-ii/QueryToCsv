@@ -1,0 +1,159 @@
+# .NET Standards
+
+Language rules file for .NET. Read together with `standard.md` (the language-agnostic
+core) in the same directory. This file is token-free by design: concrete commands with
+real project names (`dotnet format <App>.slnx`, ...) live in each repository's
+`AGENTS.md`.
+
+## Enforcement matrix
+
+Rules marked **Enforced** are guaranteed mechanically by the project scaffold — a
+violation fails the build — so AUDIT does not re-check them. Rules marked **AUDIT** have
+no mechanical guard and must be checked during AUDIT. If the repository lacks the listed
+mechanism (e.g., not yet retrofitted), treat that rule as an AUDIT item until the
+mechanism is added.
+
+| ID | Rule | Mechanism | Check |
+|----|------|-----------|-------|
+| FORMAT | Formatting follows `.editorconfig` | `dotnet format --verify-no-changes` gate in `Build.ps1` | Enforced — but run the formatter before completion (command in `AGENTS.md`) |
+| ANALYZERS | Static analysis, warnings are errors | `Directory.Build.props`: `AnalysisLevel=latest-recommended`, `EnforceCodeStyleInBuild`, `TreatWarningsAsErrors` | Enforced |
+| NAMESPACE | File-scoped namespaces only | `.editorconfig` (`csharp_style_namespace_declarations=file_scoped:warning`) + warnings-as-errors | Enforced |
+| ASYNC | No blocking on async code; no async without await | VSTHRD analyzers (`Microsoft.VisualStudio.Threading.Analyzers`); CS1998 as error | Enforced |
+| VAR | Type inference usage | `.editorconfig` suggestions only | AUDIT |
+| STRING | Explicit `StringComparison` | — | AUDIT |
+| ERROR | Error handling | — | AUDIT |
+| CANCEL | CancellationToken plumbing | — | AUDIT |
+| FILEPATH | Paths relative to the executable | — | AUDIT |
+| LOGGING | Log location, rotation, language | — | AUDIT |
+| TEMPWORK | File operations via `%TEMP%` | — | AUDIT |
+| CONSTANTS | No magic numbers/strings | — | AUDIT |
+| COMMENTS | C# comment style | — | AUDIT |
+| TESTNAME | xUnit test naming | — | AUDIT |
+| VERSION | Single version definition + CHANGELOG release gate | Installer script `#ifndef MyAppVersion → #error` guard; the installer build injects the version and gates on a CHANGELOG heading | AUDIT — the gates cover only the installer path; "no `<Version>` in a csproj" has no guard |
+| OUTPUT | No manual or committed build outputs | Output directories are gitignored by the scaffold | AUDIT — gitignore blocks commits, not manual additions |
+| SERIAL | One dotnet command at a time per solution | — | AUDIT — behavioral: observed at command-execution time, leaves no file artifact to check |
+
+---
+
+## FORMAT: Code Formatting
+
+- **Style definition:** `.editorconfig` at the repository root is the single source of formatting rules. To change a style, edit `.editorconfig` — never deviate per file
+- **Always run the formatter before completing implementation**, and do not report completion unless its check mode (`--verify-no-changes`) passes — the exact command is in `AGENTS.md`
+- `Build.ps1` runs the same verification and fails the build on unformatted code
+
+## ANALYZERS: Static Analysis
+
+- `Directory.Build.props` enables the built-in Roslyn analyzers (`AnalysisLevel = latest-recommended`, `EnforceCodeStyleInBuild`, `TreatWarningsAsErrors`). **Warnings are build errors in every project**
+- **Never disable or lower `TreatWarningsAsErrors` or `AnalysisLevel`.** To tolerate a specific warning, suppress it at the narrowest possible scope:
+
+| Scope | Mechanism |
+|---|---|
+| A specific line | `#pragma warning disable <ID>` followed by `restore`. Reason comment required |
+| A specific file/folder | `.editorconfig` section with `dotnet_diagnostic.<ID>.severity = none`. Reason comment required |
+| A whole project | Add the ID to `<NoWarn>` in that csproj. Reason comment required |
+
+- The reason comment states why this warning is acceptable here as a current constraint ("for now" or "fix later" is not a reason)
+
+## ASYNC: Asynchronous Code
+
+Refines the core's Synchronous vs Asynchronous section for .NET:
+
+- **Never block on async code** (`.Result`, `.Wait()`, `GetAwaiter().GetResult()`) — enforced by the VSTHRD analyzers (`Microsoft.VisualStudio.Threading.Analyzers` in `Directory.Build.props`)
+- **Do not mark a method async when nothing in it awaits** — CS1998 is an error under warnings-as-errors
+- When a suppression is genuinely justified (e.g., a synchronous entry point mandated by a framework), follow the ANALYZERS suppression tiers with a reason comment
+
+## NAMESPACE: Namespaces
+
+- **File-scoped namespaces only** (`namespace X;`) — enforced via `.editorconfig` + warnings-as-errors
+
+## VAR: Type Inference
+
+- **Use `var`** for `new` expressions and other obvious types
+- **Use explicit types** when the type is not clear from the right-hand side
+
+## STRING: String Comparison
+
+- **Always specify `StringComparison`** for string methods (`StartsWith`, `EndsWith`, `IndexOf`, `Contains`, `Equals`)
+- **Use `StringComparison.Ordinal`** for technical comparisons (paths, identifiers)
+- **Use `StringComparison.OrdinalIgnoreCase`** when case-insensitivity is needed
+
+## ERROR: Error Handling
+
+- **No empty catch blocks:** Every `catch` must handle or log the exception
+- **No raw exception messages in output:** Never display `ex.Message` directly to users
+- **Don't log and rethrow:** The layer that handles an exception (catches without rethrowing) is responsible for logging it. A layer that rethrows must NOT log — each failure is logged exactly once
+
+## CANCEL: Cancellation Token Propagation
+
+- Every async method that performs potentially long I/O (DB, file, network, external process) MUST accept `CancellationToken ct = default` and pass it to every cancellable await — including static helpers and feature-internal classes, not only service entry points
+- This applies even when no caller currently supplies a real token
+- Do NOT pass `CancellationToken.None` where a `ct` variable is in scope
+- Rationale: the project's `docs/adr/0001-cancellation-token-plumbing.md` (scaffolded into every project)
+
+**Exempt — MUST NOT take a token (these operations must run to completion):**
+
+| Category | Examples |
+|---|---|
+| Logging | logger implementations, exception-translation helpers |
+| Transaction rollback | rollback helpers called from catch blocks |
+| Best-effort cleanup | temp file deletion, post-failure cleanup |
+| Post-commit finalization | file move/rename after a DB commit — aborting leaves files inconsistent with the committed data |
+
+## FILEPATH: File Paths
+
+- **Use `AppContext.BaseDirectory`** for paths relative to the application executable
+- **Do NOT use `Directory.GetCurrentDirectory()`** — it changes based on how the app is launched
+
+## LOGGING: Log Output Location
+
+- **Default:** `{AppContext.BaseDirectory}\Logs\` (relative to EXE location)
+- **Fallback:** If write permission is unavailable, use `{Environment.GetFolderPath(SpecialFolder.LocalApplicationData)}\{AppName}\Logs\`
+- **File name:** `{AppName}_yyyyMMdd.log` (daily rotation)
+- **Log messages MUST be written in English**
+
+## TEMPWORK: File Operations in %TEMP%
+
+When I/O targets may be network paths, perform all file reads/writes in local `%TEMP%`.
+
+- **Input**: Copy source files from network to `%TEMP%` before processing
+- **Output**: Create artifacts in `%TEMP%`, then `File.Copy` / `File.Move` to the final destination
+- **Naming**: Flat under `Path.GetTempPath()` as `{FeatureName}_{Guid.NewGuid():N}.{ext}`
+- **Cleanup**: Always delete in `finally`. Deletion failure is best-effort (log and continue)
+- **Recleanup of leftover files**: Don't rely on the `finally` deletion alone — a killed process or crash can skip it, so retry cleanup elsewhere too
+  - **Desktop apps**: On next startup, retry deleting leftover temp files older than a threshold (tune to the app's run interval)
+  - **Console/long-running apps**: On startup, or at a suitable point within the processing loop (start, end, etc. — whatever fits the app's structure), retry deleting leftover temp files the same way
+
+## CONSTANTS: Constants
+
+- **No magic numbers/strings:** Extract hardcoded values to named constants
+- **Application constants** as `const` in the owning class
+
+## COMMENTS: Code Comments (C# specifics)
+
+The comment philosophy (when to write, what never to write) is in `standard.md`.
+C# specifics:
+
+- **Language:** English
+- **Style:** Simple inline comments (`//`). No XML documentation
+
+## TESTNAME: xUnit Test Naming
+
+- Test method names use `Method_Scenario_ExpectedResult` (e.g. `Merge_EmptyInput_ReturnsEmpty`)
+- Underscore separation is the official convention; for this reason CA1707 is suppressed via `<NoWarn>` in the test project's csproj
+- Test row ordering and the other testing principles are in the `standard.md` Testing section
+
+## VERSION: Version Management
+
+- **The version is defined ONLY in the `<Version>` tag of `Directory.Build.props`.** Never add `<Version>` to a csproj or `#define MyAppVersion` to the installer script — duplicate definitions are how versions drift out of sync. The EXE inherits it via MSBuild; the installer build injects it (the `.iss` fails with `#error` when it is not injected)
+- **Version bump**: update `<Version>`, add a `## [x.y.z]` heading and entry to `CHANGELOG.md` if it exists, and include both in the **same commit**. Building the installer without the changelog heading fails at the gate
+- Semantic Versioning (MAJOR.MINOR.PATCH); during development `0.x.x` (release as `1.0.0`); MINOR: new features, PATCH: bug fixes and small changes
+
+## OUTPUT: Build Outputs
+
+- **Never manually add files to build output directories, and never commit them** — outputs are produced only by the build scripts (the scaffold gitignores the output directories; `AGENTS.md` names them)
+
+## SERIAL: Sequential Command Execution
+
+- **Run `dotnet` commands that touch build state (`build`, `test`, `publish`, `format`, `restore`) and the scripts that wrap them one at a time per solution** — start the next only after the previous has exited, and never launch them in parallel background shells
+- MSBuild does not coordinate concurrent processes over the same `obj`/`bin` directories, so concurrent runs contend for each other's outputs: on Windows they fail with file-lock errors (CS2012, CS0006, MSB3061); on macOS they can hang indefinitely
+- A hang is indistinguishable from a slow build from the outside — the processes stay alive and emit nothing, so waiting longer never resolves it. Kill the stuck processes and rerun sequentially
