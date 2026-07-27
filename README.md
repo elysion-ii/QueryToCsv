@@ -22,7 +22,7 @@ A CLI tool that connects to Microsoft SQL Server, executes `.sql` files, and exp
 
 ## Download
 
-Pre-built binaries are available on the [Releases](https://github.com/luxon-45/QueryToCsv/releases/latest) page.
+Pre-built binaries are available on the [Releases](https://github.com/elysion-ii/QueryToCsv/releases/latest) page.
 
 | File | Description |
 |------|-------------|
