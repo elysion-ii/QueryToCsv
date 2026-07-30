@@ -28,12 +28,13 @@ Rule bodies live under `docs/rules/`. Edit this file, never `CLAUDE.md`.
 ## Rules and AUDIT
 
 - **Before implementing any change**, read in order: `docs/rules/standard.md` (shared core), `docs/rules/dotnet.md` (.NET rules), then the application's rules file and specification from the Applications table. On conflict the more specific file wins (application > language > core)
+- **When the application being changed exposes a command-line interface** (a console application, or a GUI application that accepts command-line options), also read `docs/rules/cli.md`
 - **Before creating, changing, moving, renaming, archiving, or deleting any document**, also read `docs/rules/documentation.md`
 - **Before any Git write operation or PR operation** (commit, branch, push, PR creation, update, or merge), also read `docs/rules/git.md`
-- When a change requires behavior not in the specification, update the specification **before** implementing (spec-first — see the Specifications section of `docs/rules/standard.md`)
+- **When a change requires behavior not in the specification**, spec-first applies — read the Specifications section of `docs/rules/standard.md` before implementing
 - **When transitioning from a plan to implementation**, re-read this file (root and any nested `AGENTS.md` covering the work area) and the rules files first, so all rules are loaded before code is written
 - **Before reporting an implementation task as complete**, run the AUDIT procedure at the end of `docs/rules/standard.md`
-- `docs/rules/standard.md`, `docs/rules/documentation.md`, `docs/rules/git.md`, and `docs/rules/dotnet.md` are managed by dev-standards — never edit them; repository- and application-specific rules go in `docs/rules/QueryToCsv.md`
+- `docs/rules/standard.md`, `docs/rules/documentation.md`, `docs/rules/git.md`, `docs/rules/cli.md`, and `docs/rules/dotnet.md` are managed by dev-standards — never edit them; repository- and application-specific rules go in `docs/rules/QueryToCsv.md`
 
 ## Commands
 
@@ -70,7 +71,7 @@ Build scripts and installer configuration.
 
 - `Build.ps1` runs format verification (`dotnet format --verify-no-changes`) and tests, then publishes QueryToCsv as a self-contained single-file EXE to `build/QueryToCsv/`. Both gates must pass before publish proceeds. It also stages `appsettings.json` (from the sample) and the `queries/`, `output/` folders that the installer ships
 - `Installer.ps1` invokes Inno Setup (ISCC.exe) on `Setup_QueryToCsv.iss`; requires `build/QueryToCsv/QueryToCsv.exe` to exist. Before running ISCC it reads `<Version>` from `Directory.Build.props`, injects it via `/DMyAppVersion`, and — if `CHANGELOG.md` exists — verifies it contains a heading for the current version (fails otherwise). The version and CHANGELOG rules are `docs/rules/dotnet.md` VERSION
-- Output directories: `build/QueryToCsv/` (self-contained EXE) and `build/Installer/` (installer package), produced only by the scripts and gitignored (rules: `docs/rules/dotnet.md` OUTPUT)
+- Output directories: `build/QueryToCsv/` (self-contained EXE) and `build/Installer/` (installer package), both gitignored (rules: `docs/rules/dotnet.md` OUTPUT)
 
 ### `docs/`
 
@@ -78,14 +79,13 @@ All non-source documents, placed in role-based subfolders (`rules/`, `adr/`, `sp
 `guides/`, `references/`, `investigations/`, `notes/`, `plans/`, `inbox/`, `archive/`).
 Before creating, changing, moving, renaming, archiving, or deleting any document — or
 when unsure where one belongs — read `docs/rules/documentation.md` (also distributed
-in this repository) first; it defines placement, naming, and front matter. Do not
-classify or name documents from memory.
+in this repository) first; it defines placement, naming, and front matter.
 
-- `docs/rules/` — rule bodies: `standard.md`, `documentation.md`, `git.md` + `dotnet.md` (managed by dev-standards) and `QueryToCsv.md` (application rules)
+- `docs/rules/` — rule bodies: `standard.md`, `documentation.md`, `git.md`, `cli.md` + `dotnet.md` (managed by dev-standards) and `QueryToCsv.md` (application rules)
 - `docs/specs/QueryToCsv.md` — the QueryToCsv specification: what it does
 - `docs/guides/` — repository-specific procedures, including `release.md`
 - `docs/adr/` — Architecture Decision Records; retired ADRs move to `docs/adr/archive/`
-- `docs/plans/` and `docs/archive/plans/` — working area for plans, gitignored: plans never enter the repository, in progress or archived
+- `docs/plans/` and `docs/archive/plans/` — working area for plans, gitignored (`docs/rules/documentation.md`, `docs/plans/`)
 
 ### Runtime layout (installed application)
 

@@ -15,15 +15,18 @@ matching kind of work.
 2. Read every language file in this directory that matches the project's technology
    stack (a .NET repository reads `dotnet.md`; a multi-stack repository reads all
    matching files). The repository's `AGENTS.md` states the stack and the concrete
-   commands (formatter, build, test).
+   commands (formatter, build, test). When the application being changed exposes a
+   command-line interface — a console application, or a GUI application that accepts
+   command-line options — also read `cli.md`; it applies regardless of stack and sits
+   at the same precedence level as the language files.
 3. Identify the application being changed in the `AGENTS.md` Applications table, then
    read its rules file and its specification (`docs/specs/...`).
 4. Each language file begins with an **enforcement matrix** stating which rules the
    project scaffold enforces mechanically (analyzers, build gates) and which must be
    checked by AUDIT.
 5. Precedence on conflict within this always-read chain: the more specific file wins —
-   application rules > language rules > this file. `AGENTS.md` holds no rule text; it
-   only routes.
+   application rules > language rules and `cli.md` > this file. `AGENTS.md` holds no
+   rule text; it only routes.
 6. Two more rule files in this directory are task-specific, outside the chain above,
    and read in addition only when that kind of work is underway: `documentation.md`
    when creating, changing, moving, renaming, archiving, or deleting any document;
@@ -179,6 +182,16 @@ If the current code is clear without a comment, write no comment. If the reason 
 
 - **Spec-first**: when a change requires behavior not in the specification (`docs/specs/...`, listed in the `AGENTS.md` Applications table), update the specification before implementing. Never retro-fit the spec to the implementation afterwards
 - What a specification must contain and how it is structured is defined in `documentation.md`
+
+---
+
+## Version Display
+
+- Every application must expose the version it was built with, in the form `AppName X.Y.Z` (e.g., `MyApp 1.22.3`)
+- GUI applications display it somewhere always reachable in the UI (title bar, about screen, footer)
+- CLI applications provide `--version` / `-V`; the concrete requirements are in `cli.md`
+- The default format is the bare product version — no build hash, build date, or other metadata. The application rules file may override the format (e.g., to append a build identifier); without such an override, the simple form applies
+- The displayed value comes from the project's single version definition (see the language file's version-management rules), never from a hardcoded string
 
 ---
 

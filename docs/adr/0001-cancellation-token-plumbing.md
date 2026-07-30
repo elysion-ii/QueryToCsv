@@ -4,7 +4,7 @@ status: accepted
 
 # Plumb CancellationToken Before Any Caller Supplies a Real Token
 
-## Background
+## Context
 
 While no caller supplies a real token yet — the GUI has no cancel button, the console app has not wired Ctrl+C — it is tempting to omit `CancellationToken` parameters ("nobody passes a real token anyway") or to pass `CancellationToken.None` at call sites.
 

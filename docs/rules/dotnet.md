@@ -29,8 +29,8 @@ mechanism is added.
 | CONSTANTS | No magic numbers/strings | — | AUDIT |
 | COMMENTS | C# comment style | — | AUDIT |
 | TESTNAME | xUnit test naming | — | AUDIT |
-| VERSION | Single version definition + CHANGELOG release gate | Installer script `#ifndef MyAppVersion → #error` guard; the installer build injects the version and gates on a CHANGELOG heading | AUDIT — the gates cover only the installer path; "no `<Version>` in a csproj" has no guard |
-| OUTPUT | No manual or committed build outputs | Output directories are gitignored by the scaffold | AUDIT — gitignore blocks commits, not manual additions |
+| VERSION | Single version definition + CHANGELOG release gate + clean displayed version | Installer script `#ifndef MyAppVersion → #error` guard; the installer build injects the version and gates on a CHANGELOG heading; `Directory.Build.props` sets `IncludeSourceRevisionInInformationalVersion=false` | AUDIT — the gates cover only the installer path; "no `<Version>` in a csproj" has no guard, and a deleted `<Version>` in `Directory.Build.props` falls back to the SDK default (1.0.0) unguarded |
+| OUTPUT | Build outputs come only from the build scripts; never manual, never committed | Output directories are gitignored by the scaffold; `Build.ps1` gates publishing on the format check and the test suite | AUDIT — gitignore keeps outputs out of normal staging; it does not stop forced adds, manual additions, or hand-run publishing |
 | SERIAL | One dotnet command at a time per solution | — | AUDIT — behavioral: observed at command-execution time, leaves no file artifact to check |
 
 ---
@@ -146,11 +146,14 @@ C# specifics:
 
 - **The version is defined ONLY in the `<Version>` tag of `Directory.Build.props`.** Never add `<Version>` to a csproj or `#define MyAppVersion` to the installer script — duplicate definitions are how versions drift out of sync. The EXE inherits it via MSBuild; the installer build injects it (the `.iss` fails with `#error` when it is not injected)
 - **Version bump**: update `<Version>`, add a `## [x.y.z]` heading and entry to `CHANGELOG.md` if it exists, and include both in the **same commit**. Building the installer without the changelog heading fails at the gate
+- **The installer build is the release packaging step** — it carries the CHANGELOG gate; the EXE that `Build.ps1` publishes is a build output the installer wraps, not a release
 - Semantic Versioning (MAJOR.MINOR.PATCH); during development `0.x.x` (release as `1.0.0`); MINOR: new features, PATCH: bug fixes and small changes
+- **Displayed version** (Version Display in `standard.md`, VERSIONOUT in `cli.md`): read `AssemblyInformationalVersionAttribute` — it equals `<Version>` because `Directory.Build.props` sets `IncludeSourceRevisionInInformationalVersion=false`, which stops the SDK from appending `+<git sha>`. Never remove that property while the displayed version must stay `AppName X.Y.Z`
 
 ## OUTPUT: Build Outputs
 
 - **Never manually add files to build output directories, and never commit them** — outputs are produced only by the build scripts (the scaffold gitignores the output directories; `AGENTS.md` names them)
+- **Produce distributables only via the build scripts** — `Build.ps1` runs the format check and the test suite before publishing; invoking `dotnet publish` by hand skips those gates
 
 ## SERIAL: Sequential Command Execution
 

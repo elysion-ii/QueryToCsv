@@ -6,6 +6,7 @@
          anywhere else; Installer.ps1 reads this value and injects it into the
          Inno Setup script, and checks CHANGELOG.md (if present) for an entry. -->
     <Version>1.5.0</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>

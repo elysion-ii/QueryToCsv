@@ -1,3 +1,6 @@
+# Default: normalize every text file in the index; rules below refine per type
+* text=auto
+
 # Text files
 *.cs        text diff=csharp
 *.csproj    text

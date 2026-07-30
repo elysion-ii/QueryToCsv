@@ -20,8 +20,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "in=$(cat); if printf '%s' \"$in\" | grep -Eq 'git[^A-Za-z]{1,4}commit' && ! printf '%s' \"$in\" | grep -q 'audit\\.ok=true'; then printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"AUDIT not confirmed. Run the AUDIT procedure in docs/rules and fix issues; if already complete, re-run with: git -c audit.ok=true commit\"}}'; fi",
-            "commandWindows": "$in = [Console]::In.ReadToEnd(); if ($in -match 'git[^A-Za-z]{1,4}commit' -and $in -notmatch 'audit\\.ok=true') { '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"AUDIT not confirmed. Run the AUDIT procedure in docs/rules and fix issues; if already complete, re-run with: git -c audit.ok=true commit\"}}' }",
+            "command": "in=$(cat); if printf '%s' \"$in\" | grep -Eq '(^|[^[:alnum:]_.-])git([[:space:]]+-[^[:space:]]+([[:space:]]+[^[:space:]]+)?)*[[:space:]]+commit([[:space:]\"\\\\]|$)' && ! printf '%s' \"$in\" | grep -q 'audit\\.ok=true'; then printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"AUDIT not confirmed. Run the AUDIT procedure in docs/rules and fix issues; if already complete, re-run with: git -c audit.ok=true commit\"}}'; fi",
+            "commandWindows": "$in = [Console]::In.ReadToEnd(); if ($in -match '(^|[^\\w.-])git(\\s+-\\S+(\\s+\\S+)?)*\\s+commit([\\s\"\\\\]|$)' -and $in -notmatch 'audit\\.ok=true') { '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"AUDIT not confirmed. Run the AUDIT procedure in docs/rules and fix issues; if already complete, re-run with: git -c audit.ok=true commit\"}}' }",
             "timeout": 10,
             "statusMessage": "Audit gate"
           }

@@ -97,7 +97,7 @@ differ between categories. Use the same application identifier in every category
 ## Category notes
 
 - **`AGENTS.md` (router)**: repository and application descriptions, technology stack, the Applications table (rules ↔ specification paths), real commands, and reading/AUDIT instructions. No rule text — rule bodies live in `docs/rules/`. Never duplicate a rule across files.
-- **`docs/rules/`**: rule bodies in layers — the shared core (`standard.md`), task-specific rule files (`documentation.md`, `git.md`, read only for the matching kind of work), and per-stack language files are distributed verbatim by dev-standards (never edit them; retrofit updates them from a pinned tag and reports local edits); application rules files are repository-authored and hold only deltas and overrides against the shared rules. The more specific file wins on conflict.
+- **`docs/rules/`**: rule bodies in layers — the shared core (`standard.md`), task-specific rule files (`documentation.md`, `git.md`, read only for the matching kind of work), the interface-specific `cli.md` (read when the application exposes a command-line interface), and per-stack language files are distributed verbatim by dev-standards (never edit them; retrofit updates them from a pinned tag and reports local edits); application rules files are repository-authored and hold only deltas and overrides against the shared rules. The more specific file wins on conflict.
 - **`docs/specs/`**: states what the system must do — purpose, scope, users and external systems, required behavior, inputs and outputs, error behavior, invariants, non-functional requirements, and what is out of scope. Specifications describe behavior, not implementation: no class structures, libraries, or internal algorithms. Requirement IDs are optional; when present, tests reference them so conformance is verifiable. (The rule that a spec must be updated before implementing behavior it does not yet cover — spec-first — is a development rule and lives in `standard.md`, not here.)
 - **`docs/adr/`**: the adopted decision plus reasoning, constraints, rejected alternatives, and revisit conditions. Body sections (Nygard-style): Context, Decision, Consequences (required); Alternatives considered, Revisit when (when they exist). A superseded ADR names its successor in front matter (`superseded-by`); an ADR stays an ADR — retired ones go to `docs/adr/archive/`, never `docs/archive/`.
 - **`docs/guides/`**: repository- or application-specific reproducible procedures. Exception: a generic procedure that a distributed task-specific rule file already defines (e.g., the `gh pr merge` procedure in `git.md`) is not duplicated here — the rule file is the sole source for that procedure. `docs/guides/` holds only what the rule files do not already cover, including a procedure that layers repository-specific decisions on top of one (e.g., a release guide that adds this repository's own release/tag decision on top of the generic Git procedure).
@@ -108,8 +108,10 @@ differ between categories. Use the same application identifier in every category
 
 ## Front matter
 
-Every document carries front matter with at least `created` and `status`. Three
-exemptions: in-progress plans under `docs/plans/` (front matter is added when archived);
+Every document carries front matter with at least `created` and `status`. Four
+exemptions: repository-root entry files (`README.md`, `CHANGELOG.md`), which face
+external readers and tooling that expect them to open with their content;
+in-progress plans under `docs/plans/` (front matter is added when archived);
 ADRs, which do **not** carry `created` — the sequence number and git history already
 encode chronology, so ADR front matter is `status` only, plus `supersedes`/`superseded-by`
 when applicable (never add `created` to an ADR); and dev-standards-managed files under
