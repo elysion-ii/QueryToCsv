@@ -35,12 +35,6 @@ Pre-built binaries are available on the [Releases](https://github.com/elysion-ii
 
 Run `build/Menu.bat` and select **Build** from the menu. This produces a self-contained executable in `build/QueryToCsv/`. The build runs a code format check and the test suite first, and stops if either fails.
 
-Alternatively, build directly:
-
-```
-dotnet publish QueryToCsv/QueryToCsv.csproj -c Release -f net10.0 -r win-x64 --self-contained true -p:PublishSingleFile=true
-```
-
 ### 2. Configure
 
 Copy `appsettings.sample.json` to `appsettings.json` in the same directory as the executable, then edit the connection string and paths.
@@ -99,7 +93,7 @@ Run a query non-interactively with CLI options. Useful for scripts, scheduled ta
 Inline query with defaults (single connection, UTF-8, with header):
 
 ```
-QueryToCsv -q "SELECT * FROM Users"
+QueryToCsv --query "SELECT * FROM Users"
 ```
 
 SQL file with defaults:
@@ -111,19 +105,23 @@ QueryToCsv -f sales_report.sql
 All options specified:
 
 ```
-QueryToCsv -c "Dev Server" -q "SELECT * FROM Users WHERE Active = 1" --no-header -e utf-8-bom
+QueryToCsv -c "Dev Server" --query "SELECT * FROM Users WHERE Active = 1" --no-header -e utf-8-bom
 ```
 
 | Option | Long | Required | Default | Description |
 |--------|------|----------|---------|-------------|
 | `-c` | `--connection` | If multiple connections | Auto-select if only one | Connection name from appsettings.json |
-| `-q` | `--query` | One of `-q`/`-f` | - | Inline SQL string |
-| `-f` | `--file` | One of `-q`/`-f` | - | SQL file name (resolved in QueryFolder) or absolute path |
+| - | `--query` | One of `--query`/`--file` | - | Inline SQL string |
+| `-f` | `--file` | One of `--query`/`--file` | - | SQL file name (resolved in QueryFolder) or absolute path |
 | `-e` | `--encoding` | No | `utf-8` | CSV encoding: `utf-8`, `utf-8-bom`, `utf-16`, `shift-jis` |
 | | `--header` | No | (default) | Include header row |
 | | `--no-header` | No | - | Exclude header row |
 
-When `-q` or `-f` is present, the tool runs in one-liner mode and skips all interactive prompts. When neither is present, the tool runs in interactive mode as usual.
+Long-form values accept both `--name value` and `--name=value`. The `-q` short name is
+not accepted because it is reserved for quiet mode. When `--query` or `--file` is
+present, the tool runs in one-liner mode and skips all interactive prompts. With no
+arguments, the tool runs in interactive mode. Supplying one-liner options without either
+`--query` or `--file` is a usage error.
 
 ### Help
 
@@ -131,6 +129,15 @@ When `-q` or `-f` is present, the tool runs in one-liner mode and skips all inte
 QueryToCsv -h
 QueryToCsv --help
 ```
+
+### Version
+
+```
+QueryToCsv -V
+QueryToCsv --version
+```
+
+Both forms print `QueryToCsv X.Y.Z` and exit without loading configuration.
 
 ### Open Folders / Config
 
@@ -293,22 +300,21 @@ If a file with the same name already exists, a suffix is appended: `_2`, `_3`, e
 
 | Scenario | Behavior |
 |----------|----------|
-| `appsettings.json` missing | Error message, exit code 1 |
-| Invalid JSON in config | `Error: Failed to load appsettings.json.`, exit code 1 |
-| Invalid config values | `Error: <detail>`, exit code 1 |
-| `QueryFolder` does not exist | Error message, exit code 1 |
+| `appsettings.json` missing | `QueryToCsv: appsettings.json not found.`, exit code 1 |
+| Invalid JSON in config | `QueryToCsv: failed to load appsettings.json.`, exit code 1 |
+| Invalid config values | `QueryToCsv: <detail>`, exit code 1 |
+| `QueryFolder` does not exist | `QueryToCsv: QueryFolder not found: <path>`, exit code 1 |
 | No `.sql` files found | Only "Enter query directly" (option 0) is shown; direct input is still available |
 | `OutputFolder` does not exist | Automatically created |
-| Connection failure | `Error: <detail>`, exit code 1 |
-| SQL execution error | `Error: <detail>`, exit code 1 |
-| Query timeout | `Error: Query timed out.`, exit code 1 |
-| Non-SELECT statement detected | `Error: Only SELECT statements are allowed.`, exit code 1 |
-| `-q` and `-f` both specified | `Error: -q and -f cannot be used together.`, exit code 1 |
-| `-c` name not found | `Error: Connection "<name>" not found.`, exit code 1 |
-| `-c` omitted with multiple connections | `Error: -c is required when multiple connections are configured.`, exit code 1 |
-| `-f` file not found | `Error: SQL file not found: <path>`, exit code 1 |
-| Unknown `-e` encoding | `Error: Unknown encoding "<name>". Use: utf-8, utf-8-bom, utf-16, shift-jis`, exit code 1 |
-| Unknown CLI option | `Error: Unknown option: <option>`, exit code 1 |
+| Connection or SQL execution failure | `QueryToCsv: query execution failed.`, exit code 1 |
+| Query timeout | `QueryToCsv: query timed out.`, exit code 1 |
+| Non-SELECT statement detected | `QueryToCsv: only SELECT statements are allowed.`, exit code 1 |
+| `--query` and `--file` both specified | Usage error with a `--help` hint, exit code 2 |
+| `-c` name not found | Usage error with a `--help` hint, exit code 2 |
+| `-c` omitted with multiple connections | Usage error with a `--help` hint, exit code 2 |
+| `-f` file not found | `QueryToCsv: SQL file not found: <path>`, exit code 1 |
+| Unknown `-e` encoding | Usage error with a `--help` hint, exit code 2 |
+| Unknown CLI option or positional argument | Usage error with a `--help` hint, exit code 2 |
 | Query returns 0 rows | CSV written (empty or header-only), exit code 0 |
 
 ### Exit Codes
@@ -316,7 +322,8 @@ If a file with the same name already exists, a suffix is appended: `_2`, `_3`, e
 | Code | Meaning |
 |------|---------|
 | `0` | Success |
-| `1` | Error |
+| `1` | Runtime error |
+| `2` | Usage error |
 
 ## License
 

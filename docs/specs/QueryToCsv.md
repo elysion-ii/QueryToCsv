@@ -25,8 +25,8 @@ whose format is fixed by configuration.
 ## Scope
 
 The behavior of the `QueryToCsv` executable: its two run modes (interactive and
-one-liner), its auxiliary modes (help, open), configuration, CSV output, logging, and
-error reporting.
+one-liner), its auxiliary modes (help, version, open), configuration, CSV output,
+logging, and error reporting.
 
 Projects: `QueryToCsv` (the application), `QueryToCsv.Tests` (its tests).
 
@@ -49,11 +49,17 @@ The first argument decides the mode:
 |---|---|
 | none | Interactive |
 | `-h` or `--help` first | Help |
+| `-V` or `--version` first | Version |
 | `--open <target>` | Open |
 | anything else | One-liner |
 
-Help prints usage and exits 0 without loading configuration. Open acts on the target and
+Help prints usage and exits 0 without loading configuration. Version prints
+`QueryToCsv X.Y.Z`, with the version inherited from `Directory.Build.props` and no
+build metadata, then exits 0 without loading configuration. Open acts on the target and
 exits. Both other modes load and validate configuration first.
+
+Help contains a one-line summary, usage forms, every option, the open targets, and
+representative examples.
 
 ### QueryToCsv-002: Configuration loading
 
@@ -99,8 +105,8 @@ Options replace the prompts, so nothing is asked:
 | Option | Long | Required | Default |
 |---|---|---|---|
 | `-c` | `--connection` | Only when several connections are configured | The single configured connection |
-| `-q` | `--query` | Exactly one of `-q` / `-f` | — |
-| `-f` | `--file` | Exactly one of `-q` / `-f` | — |
+| — | `--query` | Exactly one of `--query` / `--file` | — |
+| `-f` | `--file` | Exactly one of `--query` / `--file` | — |
 | `-e` | `--encoding` | No | `utf-8` |
 | | `--header` / `--no-header` | No | header included |
 
@@ -110,10 +116,15 @@ value after an option is taken verbatim, even when it looks like another option.
 `--header` / `--no-header` flags: the last one wins. `-f` accepts a file name resolved in
 `QueryFolder`, or an absolute path.
 
+Long-form option values are accepted as either `--name value` or `--name=value`.
+Everything after `--` is treated as an argument rather than an option. One-liner mode
+accepts no positional arguments, so any argument after the separator is a usage error.
+The `-q` short name is not accepted because CLI standards reserve it for quiet mode.
+
 ### QueryToCsv-006: Open mode
 
-`--open <target>` opens a location and exits, so the install directory does not have to
-be navigated by hand.
+`--open <target>` or `--open=<target>` opens a location and exits, so the install
+directory does not have to be navigated by hand.
 
 | Target | Opens |
 |---|---|
@@ -123,7 +134,8 @@ be navigated by hand.
 | `log` | The `logs` folder next to the executable |
 | anything else | That path, treated as a file |
 
-A missing target reports the error and exits 1.
+If the requested file or folder does not exist, the application reports the error and
+exits 1. Omitting the value after `--open` is a usage error and exits 2.
 
 ### QueryToCsv-007: SELECT-only enforcement
 
@@ -182,32 +194,36 @@ connection string.
 | Output | One CSV file in `OutputFolder` per successful run |
 | Output | Progress and result messages on standard output, errors on standard error |
 | Output | Log entries under `logs/` |
-| Output | Exit code 0 (success) or 1 (any error) |
+| Output | Exit code 0 (success), 1 (runtime error), or 2 (usage error) |
 
 ## Error Behavior
 
-Every error prints a message beginning with `Error: ` to standard error and exits 1. No
-partial CSV is left behind.
+Every error prints a message beginning with `QueryToCsv: ` to standard error. Runtime
+errors exit 1. Usage errors exit 2 and print
+`Try 'QueryToCsv --help' for more information.` on the following line. No partial CSV
+is left behind.
 
 | Scenario | Message |
 |---|---|
-| `appsettings.json` missing | `Error: appsettings.json not found.` |
-| Configuration unparseable | `Error: Failed to load appsettings.json.` with the reason |
-| Invalid configuration value | `Error: ` plus the setting and the reason |
-| `QueryFolder` does not exist | `Error: QueryFolder not found: <path>` |
-| Non-SELECT statement | `Error: Only SELECT statements are allowed.` |
-| Connection or execution failure | `Error: ` plus the server's report |
-| Query timeout | `Error: Query timed out.` |
-| Direct entry left empty | `Error: No query entered.` |
-| `-q` and `-f` together | `Error: -q and -f cannot be used together.` |
-| Neither `-q` nor `-f` with other options | `Error: -q or -f is required when using CLI options.` |
-| Option given without its value | `Error: <option> requires a value.` |
-| Unknown option | `Error: Unknown option: <option>` |
-| `-c` naming an unconfigured connection | `Error: Connection "<name>" not found.` |
-| `-c` omitted with several connections | `Error: -c is required when multiple connections are configured.` |
-| `-f` file not found | `Error: SQL file not found: <path>` |
-| Unknown `-e` value | `Error: Unknown encoding "<name>". Use: utf-8, utf-8-bom, utf-16, shift-jis` |
-| `--open` target missing | `Error: File not found: <path>` / `Error: Folder not found: <path>`; for `output`, a note that running a query creates it |
+| `appsettings.json` missing | `QueryToCsv: appsettings.json not found.` |
+| Configuration unparseable | `QueryToCsv: failed to load appsettings.json.` |
+| Invalid configuration value | `QueryToCsv: ` plus the setting and the reason |
+| `QueryFolder` does not exist | `QueryToCsv: QueryFolder not found: <path>` |
+| Non-SELECT statement | `QueryToCsv: only SELECT statements are allowed.` |
+| Connection or execution failure | `QueryToCsv: query execution failed.` |
+| Query timeout | `QueryToCsv: query timed out.` |
+| Direct entry left empty | `QueryToCsv: no query entered.` |
+| `--query` and `--file` together | `QueryToCsv: options '--query' and '--file' cannot be used together.` |
+| Neither `--query` nor `--file` with other options | `QueryToCsv: either '--query' or '--file' is required when using one-liner options.` |
+| Option given without its value | `QueryToCsv: option '<option>' requires a value.` |
+| Value supplied to a flag | `QueryToCsv: option '<option>' does not accept a value.` |
+| Unknown option | `QueryToCsv: unknown option '<option>'` |
+| Positional argument | `QueryToCsv: unexpected argument '<argument>'` |
+| `-c` naming an unconfigured connection | `QueryToCsv: connection "<name>" not found.` |
+| `-c` omitted with several connections | `QueryToCsv: option '--connection' is required when multiple connections are configured.` |
+| `-f` file not found | `QueryToCsv: SQL file not found: <path>` |
+| Unknown `-e` value | `QueryToCsv: unknown encoding "<name>". Use: utf-8, utf-8-bom, utf-16, shift-jis` |
+| Requested `--open` target does not exist | `QueryToCsv: file not found: <path>` / `QueryToCsv: folder not found: <path>`; for `output`, a note that running a query creates it |
 
 A query returning zero rows is not an error: the file is written and the run exits 0.
 
@@ -241,11 +257,13 @@ A query returning zero rows is not an error: the file is written and the run exi
 
 | Requirement | Tests |
 |---|---|
+| QueryToCsv-001 (mode selection and version text) | `CliInvocationTests`, `ApplicationVersionTests` |
 | QueryToCsv-003 | `AppSettingsTests` |
 | QueryToCsv-005 | `CliRunArgsTests` |
 | QueryToCsv-007 | `QueryExecutorTests.IsSelectOnly_Statement_MatchesExpectation` |
 | QueryToCsv-009 | `QueryExecutorTests.BuildOutputPath_*` |
 | QueryToCsv-010 (encoding selection) | `ConsoleUiTests` |
 
-QueryToCsv-001, -002, -004, -006, -008, -011 and the CSV writing side of -010 are not
-yet covered by tests; this document is their source of truth until they are.
+QueryToCsv-001 behavior after mode selection, -002, -004, -006, -008, -011 and the CSV
+writing side of -010 are not yet covered by tests; this document is their source of
+truth until they are.

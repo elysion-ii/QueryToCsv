@@ -25,7 +25,7 @@ public static partial class QueryExecutor
         if (!IsSelectOnly(sql))
         {
             Logger.Error($"Rejected: non-SELECT statement in {label}");
-            Console.Error.WriteLine("Error: Only SELECT statements are allowed.");
+            ConsoleMessages.WriteError("only SELECT statements are allowed.");
             return 1;
         }
 
@@ -64,19 +64,26 @@ public static partial class QueryExecutor
         catch (SqlException ex) when (ex.Number == -2)
         {
             Logger.Error("Query timed out");
-            Console.Error.WriteLine("Error: Query timed out.");
+            ConsoleMessages.WriteError("query timed out.");
             return 1;
         }
         catch (SqlException ex)
         {
             Logger.Error(ex, "SQL execution failed");
-            Console.Error.WriteLine($"Error: {ex.Message}");
+            ConsoleMessages.WriteError("query execution failed.");
             return 1;
         }
         finally
         {
-            try { if (File.Exists(tempPath)) File.Delete(tempPath); }
-            catch { /* best effort cleanup */ }
+            try
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, $"Failed to delete temporary file: {tempPath}");
+            }
         }
     }
 

@@ -35,7 +35,7 @@ public class AppSettings
 
         if (!File.Exists(configPath))
         {
-            Console.Error.WriteLine("Error: appsettings.json not found.");
+            ConsoleMessages.WriteError("appsettings.json not found.");
             return null;
         }
 
@@ -47,9 +47,9 @@ public class AppSettings
                 .AddJsonFile("appsettings.json")
                 .Build();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Console.Error.WriteLine($"Error: Failed to load appsettings.json. {ex.Message}");
+            ConsoleMessages.WriteError("failed to load appsettings.json.");
             return null;
         }
 
@@ -86,7 +86,6 @@ public class AppSettings
             settings.CsvSettings.DateFormat = csvSection["DateFormat"];
         }
 
-        // Resolve paths relative to the exe directory
         settings.QueryFolder = string.IsNullOrWhiteSpace(settings.QueryFolder)
             ? ""
             : Path.GetFullPath(settings.QueryFolder, baseDir);
@@ -101,7 +100,7 @@ public class AppSettings
     {
         if (Connections.Count == 0)
         {
-            Console.Error.WriteLine("Error: Connections must contain at least one entry.");
+            ConsoleMessages.WriteError("Connections must contain at least one entry.");
             return false;
         }
 
@@ -110,43 +109,43 @@ public class AppSettings
             var entry = Connections[i];
             if (string.IsNullOrWhiteSpace(entry.Name))
             {
-                Console.Error.WriteLine($"Error: Connections[{i}].Name is required.");
+                ConsoleMessages.WriteError($"Connections[{i}].Name is required.");
                 return false;
             }
             if (string.IsNullOrWhiteSpace(entry.ConnectionString))
             {
-                Console.Error.WriteLine($"Error: Connections[{i}].ConnectionString is required.");
+                ConsoleMessages.WriteError($"Connections[{i}].ConnectionString is required.");
                 return false;
             }
         }
 
         if (string.IsNullOrWhiteSpace(QueryFolder))
         {
-            Console.Error.WriteLine("Error: QueryFolder is required.");
+            ConsoleMessages.WriteError("QueryFolder is required.");
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(OutputFolder))
         {
-            Console.Error.WriteLine("Error: OutputFolder is required.");
+            ConsoleMessages.WriteError("OutputFolder is required.");
             return false;
         }
 
         if (QueryTimeout <= 0)
         {
-            Console.Error.WriteLine("Error: QueryTimeout must be greater than 0.");
+            ConsoleMessages.WriteError("QueryTimeout must be greater than 0.");
             return false;
         }
 
         if (CsvSettings.Delimiter.Length != 1)
         {
-            Console.Error.WriteLine("Error: Delimiter must be exactly one character.");
+            ConsoleMessages.WriteError("Delimiter must be exactly one character.");
             return false;
         }
 
         if (CsvSettings.NewLine is not ("CRLF" or "LF"))
         {
-            Console.Error.WriteLine("Error: NewLine must be \"CRLF\" or \"LF\".");
+            ConsoleMessages.WriteError("NewLine must be \"CRLF\" or \"LF\".");
             return false;
         }
 
@@ -156,7 +155,8 @@ public class AppSettings
         }
         catch (ArgumentException)
         {
-            Console.Error.WriteLine($"Error: SqlFileEncoding \"{SqlFileEncoding}\" is not a valid encoding.");
+            ConsoleMessages.WriteError(
+                $"SqlFileEncoding \"{SqlFileEncoding}\" is not a valid encoding.");
             return false;
         }
 
@@ -164,18 +164,19 @@ public class AppSettings
         {
             try
             {
-                DateTime.Now.ToString(CsvSettings.DateFormat, CultureInfo.InvariantCulture);
+                DateTime.UnixEpoch.ToString(CsvSettings.DateFormat, CultureInfo.InvariantCulture);
             }
             catch (FormatException)
             {
-                Console.Error.WriteLine($"Error: DateFormat \"{CsvSettings.DateFormat}\" is not valid.");
+                ConsoleMessages.WriteError(
+                    $"DateFormat \"{CsvSettings.DateFormat}\" is not valid.");
                 return false;
             }
         }
 
         if (!Directory.Exists(QueryFolder))
         {
-            Console.Error.WriteLine($"Error: QueryFolder not found: {QueryFolder}");
+            ConsoleMessages.WriteError($"QueryFolder not found: {QueryFolder}");
             return false;
         }
 

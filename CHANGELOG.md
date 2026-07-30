@@ -7,6 +7,31 @@ All notable changes to QueryToCsv are documented here. The format follows
 The version itself is defined in `Directory.Build.props`; `build/Installer.ps1` refuses
 to build an installer for a version that has no heading here.
 
+## [Unreleased]
+
+## [2.0.0] - 2026-07-30
+
+### Added
+
+- `-V` and `--version` print `QueryToCsv X.Y.Z` without loading configuration.
+- Long options accept both `--name value` and `--name=value`, and `--` is recognized as
+  the option separator.
+
+### Changed
+
+- **Breaking CLI change**: the reserved `-q` short option is no longer accepted. Use
+  `--query` for an inline query.
+- Help output now follows the shared CLI structure and documents every supported mode
+  and option.
+- Usage errors now use exit code 2, include a `--help` hint, and are distinguished from
+  runtime errors, which continue to use exit code 1.
+- Error messages now use the `QueryToCsv:` prefix and avoid exposing database or
+  internal exception details.
+
+### Fixed
+
+- Relative paths passed to `--open` are now resolved from the executable directory.
+
 ## [1.5.0] - 2026-07-27
 
 Maintenance release. The application behaves exactly as 1.4.1 did; everything here is

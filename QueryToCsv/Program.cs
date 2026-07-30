@@ -1,30 +1,47 @@
 using System.Diagnostics;
-using System.Reflection;
 using System.Text;
 using NLog;
 using NLog.Config;
 using NLog.Targets;
 using QueryToCsv;
 
-if (args.Length >= 1 && (args[0] == "-h" || args[0] == "--help"))
-    return PrintHelp();
-
-// --open <target>: open a folder or file and exit
-if (args.Length >= 2 && args[0] == "--open")
-    return HandleOpen(args[1]);
-
-var (runArgs, parseError) = CliRunArgs.Parse(args);
+var (invocation, parseError) = CliInvocation.Parse(args);
 if (parseError is not null)
 {
-    Console.Error.WriteLine(parseError);
-    return 1;
+    ConsoleMessages.WriteUsageError(parseError);
+    return 2;
 }
+
+switch (invocation!.Mode)
+{
+    case CliMode.Help:
+        return PrintHelp();
+    case CliMode.Version:
+        Console.WriteLine(ApplicationVersion.DisplayText);
+        return 0;
+    case CliMode.Open:
+        return HandleOpen(invocation.OpenTarget!);
+}
+
+var runArgs = invocation.RunArgs;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
+Encoding? commandLineEncoding = null;
+if (runArgs is not null)
+{
+    commandLineEncoding = ConsoleUi.ResolveEncoding(runArgs.EncodingName);
+    if (commandLineEncoding is null)
+    {
+        ConsoleMessages.WriteUsageError(
+            $"unknown encoding \"{runArgs.EncodingName}\". " +
+            "Use: utf-8, utf-8-bom, utf-16, shift-jis");
+        return 2;
+    }
+}
+
 var logger = ConfigureNLog(30);
-var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
-logger.Info($"Application started (v{version})");
+logger.Info($"Application started (v{ApplicationVersion.ProductVersion})");
 
 try
 {
@@ -52,7 +69,7 @@ try
 
     if (runArgs is not null)
     {
-        var result = RunOneLiner(settings, runArgs, logger);
+        var result = RunOneLiner(settings, runArgs, commandLineEncoding!, logger);
         if (result == 0)
             logger.Info("Application finished (exit code: 0)");
         else
@@ -110,6 +127,7 @@ try
 catch (Exception ex)
 {
     logger.Error(ex, "Unhandled exception");
+    ConsoleMessages.WriteError("unexpected application failure.");
     logger.Error("Application finished (exit code: 1)");
     return 1;
 }
@@ -118,9 +136,12 @@ finally
     LogManager.Shutdown();
 }
 
-static int RunOneLiner(AppSettings settings, CliRunArgs runArgs, Logger logger)
+static int RunOneLiner(
+    AppSettings settings,
+    CliRunArgs runArgs,
+    Encoding csvEncoding,
+    Logger logger)
 {
-    // Resolve connection
     string connectionString;
     string connectionName;
 
@@ -130,8 +151,9 @@ static int RunOneLiner(AppSettings settings, CliRunArgs runArgs, Logger logger)
             c.Name.Equals(runArgs.ConnectionName, StringComparison.OrdinalIgnoreCase));
         if (entry is null)
         {
-            Console.Error.WriteLine($"Error: Connection \"{runArgs.ConnectionName}\" not found.");
-            return 1;
+            ConsoleMessages.WriteUsageError(
+                $"connection \"{runArgs.ConnectionName}\" not found.");
+            return 2;
         }
         connectionString = entry.ConnectionString;
         connectionName = entry.Name;
@@ -143,13 +165,13 @@ static int RunOneLiner(AppSettings settings, CliRunArgs runArgs, Logger logger)
     }
     else
     {
-        Console.Error.WriteLine("Error: -c is required when multiple connections are configured.");
-        return 1;
+        ConsoleMessages.WriteUsageError(
+            "option '--connection' is required when multiple connections are configured.");
+        return 2;
     }
 
     logger.Info($"Connection selected: {connectionName}");
 
-    // Resolve query
     string sql;
     string? baseName;
 
@@ -168,7 +190,7 @@ static int RunOneLiner(AppSettings settings, CliRunArgs runArgs, Logger logger)
 
         if (!File.Exists(filePath))
         {
-            Console.Error.WriteLine($"Error: SQL file not found: {filePath}");
+            ConsoleMessages.WriteError($"SQL file not found: {filePath}");
             return 1;
         }
 
@@ -178,14 +200,6 @@ static int RunOneLiner(AppSettings settings, CliRunArgs runArgs, Logger logger)
         logger.Info($"Query selected: {Path.GetFileName(filePath)}");
     }
 
-    // Resolve encoding
-    var csvEncoding = ConsoleUi.ResolveEncoding(runArgs.EncodingName);
-    if (csvEncoding is null)
-    {
-        Console.Error.WriteLine($"Error: Unknown encoding \"{runArgs.EncodingName}\". Use: utf-8, utf-8-bom, utf-16, shift-jis");
-        return 1;
-    }
-
     logger.Info($"Header: {(runArgs.IncludeHeader ? "yes" : "no")}, Encoding: {csvEncoding.EncodingName}");
 
     return QueryExecutor.Execute(settings, connectionString, sql, baseName, runArgs.IncludeHeader, csvEncoding);
@@ -193,34 +207,41 @@ static int RunOneLiner(AppSettings settings, CliRunArgs runArgs, Logger logger)
 
 static int PrintHelp()
 {
-    var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
-    Console.WriteLine($"QueryToCsv v{version}");
+    Console.WriteLine(ApplicationVersion.DisplayText);
     Console.WriteLine();
-    Console.WriteLine("USAGE");
-    Console.WriteLine("  QueryToCsv                      Run interactively");
-    Console.WriteLine("  QueryToCsv -q <sql> [options]   Run a query and exit");
-    Console.WriteLine("  QueryToCsv -f <file> [options]  Run a SQL file and exit");
-    Console.WriteLine("  QueryToCsv --open <target>      Open a folder or file and exit");
-    Console.WriteLine("  QueryToCsv -h | --help          Show this help");
+    Console.WriteLine("Export a SQL Server result set to CSV.");
     Console.WriteLine();
-    Console.WriteLine("OPTIONS");
+    Console.WriteLine("Usage:");
+    Console.WriteLine("  QueryToCsv");
+    Console.WriteLine("  QueryToCsv --query <sql> [options]");
+    Console.WriteLine("  QueryToCsv --file <file> [options]");
+    Console.WriteLine("  QueryToCsv --open <target>");
+    Console.WriteLine("  QueryToCsv [--help | --version]");
+    Console.WriteLine();
+    Console.WriteLine("Options:");
     Console.WriteLine("  -c, --connection <name>   Connection name from appsettings.json");
     Console.WriteLine("                            (required if multiple connections exist)");
-    Console.WriteLine("  -q, --query <sql>         Inline SQL query string");
+    Console.WriteLine("      --query <sql>         Inline SQL query string");
     Console.WriteLine("  -f, --file <name|path>    SQL file in QueryFolder, or absolute path");
     Console.WriteLine("  -e, --encoding <name>     CSV encoding: utf-8 (default), utf-8-bom,");
     Console.WriteLine("                            utf-16, shift-jis");
     Console.WriteLine("      --header              Include header row (default)");
     Console.WriteLine("      --no-header           Exclude header row");
+    Console.WriteLine("  -h, --help                Show this help");
+    Console.WriteLine("  -V, --version             Show version");
     Console.WriteLine();
-    Console.WriteLine("--open TARGETS");
+    Console.WriteLine("Open targets:");
     Console.WriteLine("  queries       Open the queries folder in Explorer");
     Console.WriteLine("  output        Open the output folder in Explorer");
     Console.WriteLine("  config        Open appsettings.json in default editor");
     Console.WriteLine("  log           Open the logs folder in Explorer");
     Console.WriteLine("  <file path>   Open a specific file with its default app");
     Console.WriteLine();
-    Console.WriteLine("CANCELLING");
+    Console.WriteLine("Examples:");
+    Console.WriteLine("  QueryToCsv --query \"SELECT TOP 10 * FROM Sales\"");
+    Console.WriteLine("  QueryToCsv --file monthly-sales.sql --encoding utf-8-bom");
+    Console.WriteLine();
+    Console.WriteLine("Cancelling:");
     Console.WriteLine("  Ctrl+C        Exit at any time");
     Console.WriteLine("  Ctrl+Z+Enter  Exit at any input prompt");
     return 0;
@@ -249,7 +270,8 @@ static int HandleOpen(string target)
                 if (string.IsNullOrWhiteSpace(path))
                 {
                     var key = isQueries ? "QueryFolder" : "OutputFolder";
-                    Console.Error.WriteLine($"Error: {key} is not configured in appsettings.json.");
+                    ConsoleMessages.WriteError(
+                        $"{key} is not configured in appsettings.json.");
                     return 1;
                 }
 
@@ -265,31 +287,41 @@ static int HandleOpen(string target)
             isFile = false;
             break;
         default:
-            path = target;
+            path = Path.IsPathRooted(target)
+                ? target
+                : Path.Combine(baseDir, target);
             isFile = true;
             break;
     }
 
-    if (isFile)
+    try
     {
-        if (!File.Exists(path))
+        if (isFile)
         {
-            Console.Error.WriteLine($"Error: File not found: {path}");
-            return 1;
+            if (!File.Exists(path))
+            {
+                ConsoleMessages.WriteError($"file not found: {path}");
+                return 1;
+            }
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
-        Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        else
+        {
+            if (!Directory.Exists(path))
+            {
+                var msg = normalizedTarget is "output"
+                    ? "output folder does not exist yet. Run a query first to create it."
+                    : $"folder not found: {path}";
+                ConsoleMessages.WriteError(msg);
+                return 1;
+            }
+            Process.Start("explorer.exe", path);
+        }
     }
-    else
+    catch (Exception)
     {
-        if (!Directory.Exists(path))
-        {
-            var msg = normalizedTarget is "output"
-                ? "Error: Output folder does not exist yet. Run a query first to create it."
-                : $"Error: Folder not found: {path}";
-            Console.Error.WriteLine(msg);
-            return 1;
-        }
-        Process.Start("explorer.exe", path);
+        ConsoleMessages.WriteError($"failed to open target: {path}");
+        return 1;
     }
 
     return 0;

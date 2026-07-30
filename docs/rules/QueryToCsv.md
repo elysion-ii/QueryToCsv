@@ -29,3 +29,16 @@ text here. On conflict, this file wins.
 - **Never commit a real `appsettings.json`.** It carries connection strings and is
   gitignored; `QueryToCsv/appsettings.sample.json` is the only configuration file in the
   repository, and every value in it stays a placeholder
+
+## Release Constraints
+
+- Every `<Version>` change in `Directory.Build.props` must be published as an annotated
+  tag `v{version}` on `main` and a matching GitHub Release; the procedure is
+  `docs/guides/release.md`
+- Every release tag must have a corresponding GitHub Release
+- Release assets must be produced with `build/Build.ps1` and `build/Installer.ps1`, and
+  every GitHub Release must include both `build/QueryToCsv/QueryToCsv.exe` and
+  `build/Installer/QueryToCsv-Setup-{version}.exe`
+- Only the current version stays published: once a new release is verified, every
+  previous version's tag and GitHub Release must be deleted as pairs, locally and on
+  `origin`, so that no tag outlives its release

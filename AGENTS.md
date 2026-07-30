@@ -54,8 +54,11 @@ Rule bodies live under `docs/rules/`. Edit this file, never `CLAUDE.md`.
 
 The main project. Contains all application source code.
 
-- `Program.cs` — entry point: help, `--open`, one-liner mode, interactive flow, NLog setup
+- `Program.cs` — entry point: help, version, `--open`, one-liner mode, interactive flow, NLog setup
+- `CliInvocation.cs` — top-level CLI mode selection and `--open` target parsing
 - `CliRunArgs.cs` — command-line parsing for one-liner mode
+- `ApplicationVersion.cs` — product-version resolution and display text
+- `ConsoleMessages.cs` — standard runtime and usage error output
 - `AppSettings.cs` — `appsettings.json` loading, path resolution, validation
 - `ConsoleUi.cs` — interactive prompts and CSV encoding resolution
 - `QueryExecutor.cs` — SELECT-only check, query execution, CSV writing

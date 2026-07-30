@@ -46,7 +46,7 @@ public static class ConsoleUi
         var sql = string.Join(Environment.NewLine, lines);
         if (string.IsNullOrWhiteSpace(sql))
         {
-            Console.Error.WriteLine("Error: No query entered.");
+            ConsoleMessages.WriteError("no query entered.");
             Environment.Exit(1);
         }
         return sql;
