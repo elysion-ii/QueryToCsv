@@ -5,6 +5,24 @@ repository at `docs/rules/git.md`. Read this file together with `standard.md` wh
 task commits, creates or updates a branch, or creates, updates, or merges a pull
 request.
 
+## Confirming Scope
+
+How far a task goes is the user's decision, not something to infer from the work being
+complete. Agree on the destination before the first Git write operation.
+
+Ask how far to go:
+
+1. Commit only
+2. Commit and push
+3. Through PR creation
+4. All the way — PR, merge, return to the default branch, delete the branch
+
+Stop at the agreed point and report. Stopping early is normal: a branch holding unpushed
+or unmerged commits is a valid resting state, not unfinished work.
+
+Never go beyond the agreed point. Do not push, open a PR, or merge because the work looks
+ready.
+
 ## Operation Language
 
 - Write all Git-related text in English by default: commit messages, branch names, PR titles and descriptions, tags, and the like
@@ -18,12 +36,15 @@ request.
 
 ## Branches
 
-- Create a new branch from the default branch's current state for a set of related changes; do not commit directly to the default branch when a PR-based review is expected
+- Treat the default branch as protected, whether or not the repository actually enforces it: never commit on it. Create a branch first, from the default branch's current state. Work on the default branch only when the user explicitly asks for it
+- A repository that works directly on the default branch says so in its application rules file; follow that instead
 - Branch names are kebab-case and describe the change; a type prefix mirroring the commit type (`feat/`, `fix/`, `docs/`, `chore/`, ...) is recommended, not required
+- A branch carries as many commits as the work needs — one PR does not mean one commit
 - Delete branches per Branch Cleanup below once their PR is merged
 
 ## Pull Requests
 
+- Landing a branch on the default branch always goes through a PR; never merge a branch locally
 - Give every PR a clear title and a description of what changed and why
 - Before relying on a PR's diff, composing a merge message, or merging, confirm the PR still reflects the intended change — re-check with `gh pr view` if commits were pushed after opening
 
