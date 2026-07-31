@@ -24,7 +24,7 @@ mechanism is added.
 | ERROR | Error handling | — | AUDIT |
 | CANCEL | CancellationToken plumbing | — | AUDIT |
 | FILEPATH | Paths relative to the executable | — | AUDIT |
-| LOGGING | Log location, rotation, language | — | AUDIT |
+| LOGGING | Log location, rotation, retention, language | — | AUDIT |
 | TEMPWORK | File operations via `%TEMP%` | — | AUDIT |
 | CONSTANTS | No magic numbers/strings | — | AUDIT |
 | COMMENTS | C# comment style | — | AUDIT |
@@ -104,12 +104,23 @@ Refines the core's Synchronous vs Asynchronous section for .NET:
 - **Use `AppContext.BaseDirectory`** for paths relative to the application executable
 - **Do NOT use `Directory.GetCurrentDirectory()`** — it changes based on how the app is launched
 
-## LOGGING: Log Output Location
+## LOGGING: Log Output and Retention
+
+### Location and format
 
 - **Default:** `{AppContext.BaseDirectory}\Logs\` (relative to EXE location)
 - **Fallback:** If write permission is unavailable, use `{Environment.GetFolderPath(SpecialFolder.LocalApplicationData)}\{AppName}\Logs\`
 - **File name:** `{AppName}_yyyyMMdd.log` (daily rotation)
 - **Log messages MUST be written in English**
+
+### Retention
+
+- **Every application deletes its own old logs.** A logging setup with no retention limit is a violation — logs are the one artifact an application grows without bound, on a machine nobody is watching
+- **Default policy: daily rotation, the newest 30 files retained.** An application whose run frequency or log volume makes 30 the wrong number picks its own limit and states the value and the reason in its application rules file
+- **Which axis to limit on follows the logging library's first-class parameter** (e.g. Serilog's `retainedFileCountLimit`). Under daily rotation a file-count limit and an age limit express the same policy; a total-size limit is an addition to one of them, never a replacement
+- **Delete only this application's own log files**, matched by the file-name pattern above — never by sweeping the directory, which can hold files the application does not own
+- **Cleanup is best-effort**: log the failure and continue. Failing to delete an old log never fails startup and never aborts a job
+- **When the limit is configurable**, Configuration Values in `standard.md` applies — a missing, unparsable, or out-of-range limit falls back to the built-in default; it never disables cleanup and never throws
 
 ## TEMPWORK: File Operations in %TEMP%
 

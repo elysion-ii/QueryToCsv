@@ -195,6 +195,20 @@ If the current code is clear without a comment, write no comment. If the reason 
 
 ---
 
+## Configuration Values
+
+Applies to every value the application reads from outside its own code — configuration
+files, environment variables, and any other external store.
+
+- **Every configurable value has a built-in default in code**, and the application runs on that default whenever the external value is missing, unparsable, or out of range. A configuration source that is absent or corrupt never fails startup
+- **Validate on read**: replace or clamp invalid values while the configuration is being loaded, so no later code has to defend against them. The valid range belongs to the value's definition, not to checks scattered across its use sites
+- **Report every substitution once**, naming the value, what was rejected, and the default applied. A silent fallback hides operator mistakes and turns a typo into an invisible change of behavior
+- **Externalizing a value is a choice**: a value nobody adjusts in the field stays a named constant in code (see the language file's constants rule). Making it configurable adds the obligations above
+- This does not relax Enforce Invariants in Code — that rule governs values the program itself produces, where a violation is a defect and must fail fast. An external value is operator input: the program keeps running on a known-good value and reports what it rejected
+- Precedence between sources, for applications that expose a command line, is in `cli.md` (CONFIG)
+
+---
+
 ## Procedure Design
 
 Applies to any ordered sequence of steps written for someone — human or agent — to
