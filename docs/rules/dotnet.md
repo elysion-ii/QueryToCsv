@@ -101,15 +101,15 @@ Refines the core's Synchronous vs Asynchronous section for .NET:
 
 ## FILEPATH: File Paths
 
-- **Use `AppContext.BaseDirectory`** for paths relative to the application executable
-- **Do NOT use `Directory.GetCurrentDirectory()`** — it changes based on how the app is launched
+- **Anchor every path to the executable's own location** — the application's files sit beside the executable, never wherever it happened to be started from. In .NET that anchor is `AppContext.BaseDirectory`
+- **Do NOT use `Directory.GetCurrentDirectory()` or bare relative paths** — both resolve against the working directory, which changes with how the application is launched (shell, shortcut, scheduled task, another process)
 
 ## LOGGING: Log Output and Retention
 
 ### Location and format
 
-- **Default:** `{AppContext.BaseDirectory}\Logs\` (relative to EXE location)
-- **Fallback:** If write permission is unavailable, use `{Environment.GetFolderPath(SpecialFolder.LocalApplicationData)}\{AppName}\Logs\`
+- **Default:** a `Logs` directory beside the executable — in .NET, `{AppContext.BaseDirectory}\Logs\`
+- **Fallback:** if that location is not writable, this application's own folder under the user's local application data — in .NET, `{Environment.GetFolderPath(SpecialFolder.LocalApplicationData)}\{AppName}\Logs\`
 - **File name:** `{AppName}_yyyyMMdd.log` (daily rotation)
 - **Log messages MUST be written in English**
 
