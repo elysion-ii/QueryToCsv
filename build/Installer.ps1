@@ -4,14 +4,51 @@ $BuildDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SolutionDir = Split-Path -Parent $BuildDir
 Set-Location $BuildDir
 
-# Check Inno Setup installation
-$IsccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+# Inno Setup installs per-machine or per-user depending on elevation, so its location
+# is discovered rather than assumed.
+function Resolve-IsccPath {
+    $Candidates = New-Object System.Collections.Generic.List[string]
 
-if (-not (Test-Path $IsccPath)) {
+    # Every installation writes an uninstall entry, in the scope it was installed to.
+    $UninstallRoots = @(
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+    )
+    Get-ChildItem $UninstallRoots -ErrorAction SilentlyContinue |
+        ForEach-Object { Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue } |
+        Where-Object { $_.DisplayName -like "*Inno Setup*" -and $_.InstallLocation } |
+        Sort-Object @{ Expression = { $_.DisplayVersion -as [version] }; Descending = $true } |
+        ForEach-Object { $Candidates.Add((Join-Path $_.InstallLocation "ISCC.exe")) }
+
+    $OnPath = Get-Command ISCC.exe -CommandType Application -ErrorAction SilentlyContinue
+    if ($OnPath) { $Candidates.Add($OnPath.Source) }
+
+    # Compil32.exe sits next to ISCC.exe.
+    $Association = (Get-ItemProperty "HKLM:\SOFTWARE\Classes\InnoSetupScriptFile\shell\Compile\command" -ErrorAction SilentlyContinue).'(default)'
+    if ($Association -match '"([^"]+)"') {
+        $Candidates.Add((Join-Path (Split-Path $Matches[1] -Parent) "ISCC.exe"))
+    }
+
+    foreach ($Base in @($env:ProgramFiles, ${env:ProgramFiles(x86)}, "$env:LOCALAPPDATA\Programs")) {
+        if (-not $Base) { continue }
+        foreach ($Major in 7, 6, 5) {
+            $Candidates.Add((Join-Path $Base "Inno Setup $Major\ISCC.exe"))
+        }
+    }
+
+    $Candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+}
+
+$IsccPath = Resolve-IsccPath
+
+if (-not $IsccPath) {
     Write-Host "   [ERROR] Inno Setup not found" -ForegroundColor Red
+    Write-Host "   Searched the uninstall registry, PATH, the .iss file association, and the default install locations" -ForegroundColor Yellow
     Write-Host "   Install Inno Setup 6 or later from https://jrsoftware.org/isdl.php" -ForegroundColor Yellow
     exit 1
 }
+Write-Host "Inno Setup: $IsccPath" -ForegroundColor Cyan
 
 # Read the app version from Directory.Build.props (single source of truth).
 # The .iss script has no version of its own; it is injected below via /D.
