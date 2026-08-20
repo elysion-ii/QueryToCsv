@@ -26,8 +26,11 @@ PrivilegesRequired=lowest
 Name: "addtopath"; Description: "Add to PATH environment variable"; GroupDescription: "Additional options:"
 
 [Files]
-; exe is always overwritten on update
-Source: "QueryToCsv\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; Ship the whole publish output, not just the executable: a native dependency
+; adds files beside it (see docs/rules/dotnet.md, NATIVEDEP). The runtime folders are
+; excluded because running the app from the build output fills them with local data;
+; [Dirs] below creates them empty at the install target.
+Source: "QueryToCsv\*"; Excludes: "appsettings.json,logs\*,queries\*,output\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; appsettings is user config, only copy on first install to preserve user settings
 Source: "QueryToCsv\appsettings.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
 
