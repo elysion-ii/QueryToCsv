@@ -33,6 +33,17 @@
     <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.*" PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- The packaging step ships the whole publish directory, and DebugType=none covers
+       only this build's own symbols — a native package carries its own beside its
+       library (see docs/rules/dotnet.md, NATIVEDEP). -->
+  <Target Name="RemoveSymbolsFromPublish"
+          AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(ResolvedFileToPublish.Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
+
   <!-- A single file that unpacks itself at run time is prohibited: it writes a
        per-build directory under the temp folder that nothing ever deletes. Both
        the project and a framework can turn this on, so the guard checks the
