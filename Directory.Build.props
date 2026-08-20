@@ -6,6 +6,10 @@
          anywhere else; Installer.ps1 reads this value and injects it into the
          Inno Setup script, and checks CHANGELOG.md (if present) for an entry. -->
     <Version>2.0.0</Version>
+
+    <!-- Keep AssemblyInformationalVersion equal to <Version>: the SDK otherwise
+         appends "+<git sha>", and the displayed version must stay "AppName X.Y.Z"
+         (see docs/rules/standard.md, Version Display). -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 
     <LangVersion>latest</LangVersion>
@@ -28,4 +32,14 @@
          ASYNC. -->
     <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.*" PrivateAssets="all" />
   </ItemGroup>
+
+  <!-- A single file that unpacks itself at run time is prohibited: it writes a
+       per-build directory under the temp folder that nothing ever deletes. Both
+       the project and a framework can turn this on, so the guard checks the
+       resolved values (see docs/rules/dotnet.md, NATIVEDEP). -->
+  <Target Name="ForbidSelfExtractingPublish"
+          BeforeTargets="GenerateSingleFileBundle"
+          Condition="'$(IncludeNativeLibrariesForSelfExtract)' == 'true' Or '$(IncludeAllContentForSelfExtract)' == 'true'">
+    <Error Text="This single-file publish would unpack itself into the temp folder on every new build, and nothing deletes what it leaves there. IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract), IncludeAllContentForSelfExtract=$(IncludeAllContentForSelfExtract). Remove whichever the project sets; where a framework sets it (WinUI 3 does), stop publishing that project as a single file (see docs/rules/dotnet.md, NATIVEDEP)." />
+  </Target>
 </Project>

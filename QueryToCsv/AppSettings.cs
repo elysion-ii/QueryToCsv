@@ -20,18 +20,21 @@ public class CsvSettings
 
 public class AppSettings
 {
+    public const string FileName = "appsettings.json";
+    public const int DefaultLogRetentionDays = 30;
+
     public List<ConnectionEntry> Connections { get; set; } = [];
     public string QueryFolder { get; set; } = "";
     public string OutputFolder { get; set; } = "";
     public int QueryTimeout { get; set; } = 30;
     public string SqlFileEncoding { get; set; } = "UTF-8";
-    public int LogRetentionDays { get; set; } = 30;
+    public int LogRetentionDays { get; set; } = DefaultLogRetentionDays;
     public CsvSettings CsvSettings { get; set; } = new();
 
     public static AppSettings? Load()
     {
         var baseDir = AppContext.BaseDirectory;
-        var configPath = Path.Combine(baseDir, "appsettings.json");
+        var configPath = Path.Combine(baseDir, FileName);
 
         if (!File.Exists(configPath))
         {
@@ -44,7 +47,7 @@ public class AppSettings
         {
             config = new ConfigurationBuilder()
                 .SetBasePath(baseDir)
-                .AddJsonFile("appsettings.json")
+                .AddJsonFile(FileName)
                 .Build();
         }
         catch (Exception)
