@@ -31,6 +31,8 @@ mechanism is added.
 | TESTNAME | xUnit test naming | — | AUDIT |
 | VERSION | Single version definition + CHANGELOG release gate + clean displayed version | Installer script `#ifndef MyAppVersion → #error` guard; the installer build injects the version and gates on a CHANGELOG heading; `Directory.Build.props` sets `IncludeSourceRevisionInInformationalVersion=false` | AUDIT — the gates cover only the installer path; "no `<Version>` in a csproj" has no guard, and a deleted `<Version>` in `Directory.Build.props` falls back to the SDK default (1.0.0) unguarded |
 | OUTPUT | Build outputs come only from the build scripts; never manual, never committed | Output directories are gitignored by the scaffold; `Build.ps1` gates publishing on the format check and the test suite | AUDIT — gitignore keeps outputs out of normal staging; it does not stop forced adds, manual additions, or hand-run publishing |
+| CONFIGFILE | Only the placeholder template of a configuration file is tracked; the file the application reads is never committed | `Build.ps1` derives the real name of every tracked `*.template.*` configuration file and fails when git tracks it; the scaffold gitignores `appsettings.json` | Enforced for the commit — deriving the shipped file and the installer's no-overwrite entry stay AUDIT items |
+| NATIVEDEP | The distributable is as few files as possible and never unpacks itself at run time; native dependencies are reduced to reach that | `Directory.Build.props` fails the build when `IncludeNativeLibrariesForSelfExtract` is enabled; the installer script ships the whole publish output | Enforced for the property — how far the native dependencies are reduced, and keeping the installer's file list exhaustive, stay AUDIT items |
 | SERIAL | One dotnet command at a time per solution | — | AUDIT — behavioral: observed at command-execution time, leaves no file artifact to check |
 
 ---
@@ -72,6 +74,10 @@ Refines the core's Synchronous vs Asynchronous section for .NET:
 - **Use explicit types** when the type is not clear from the right-hand side
 
 ## STRING: String Comparison
+
+A comparison written without `StringComparison` takes whatever the platform default is,
+and leaves the reader — and every analyzer and reviewer that passes over it — to work out
+which semantics were meant. Naming it settles that where the code is written.
 
 - **Always specify `StringComparison`** for string methods (`StartsWith`, `EndsWith`, `IndexOf`, `Contains`, `Equals`)
 - **Use `StringComparison.Ordinal`** for technical comparisons (paths, identifiers)
@@ -124,6 +130,11 @@ Refines the core's Synchronous vs Asynchronous section for .NET:
 
 ## TEMPWORK: File Operations in %TEMP%
 
+Reading and writing straight against a network path fails in ways local I/O does not:
+every operation carries the link's latency, and a connection dropped mid-write leaves a
+truncated file at the destination. Doing the work locally and moving the finished file
+keeps both problems away from the destination.
+
 When I/O targets may be network paths, perform all file reads/writes in local `%TEMP%`.
 
 - **Input**: Copy source files from network to `%TEMP%` before processing
@@ -163,8 +174,45 @@ C# specifics:
 
 ## OUTPUT: Build Outputs
 
+The build script is where the format check and the test suite run. An artifact that
+reached the output directory by any other route never passed them, and nothing about the
+file says so.
+
 - **Never manually add files to build output directories, and never commit them** — outputs are produced only by the build scripts (the scaffold gitignores the output directories; `AGENTS.md` names them)
 - **Produce distributables only via the build scripts** — `Build.ps1` runs the format check and the test suite before publishing; invoking `dotnet publish` by hand skips those gates
+
+## CONFIGFILE: Configuration Files
+
+The rule is Configuration Files in the Repository in `standard.md`. Its .NET form:
+
+- **The tracked template is `appsettings.template.json`**; the file the application reads is `appsettings.json`, which the scaffold gitignores. Any other shipped configuration file follows the same `<name>.template.<ext>` naming
+- **`Build.ps1` fails when git tracks the real name** derived from a tracked `*.template.*` file with a configuration extension. The check needs no list to maintain and stays inert in a repository that has no template file
+- **`Build.ps1` copies the template into the publish output under the real name** — that copy, not any file from the working tree, is what the installer packages
+- **The installer entry for a configuration file carries `onlyifdoesntexist`** and is excluded from the wildcard that ships the rest of the publish output, so an update keeps the operator's settings
+
+## NATIVEDEP: Native Dependencies and Publish Layout
+
+**The goal is the smallest distributable: one self-contained executable.** Self-contained
+single-file publishing reaches it by bundling the runtime and every managed assembly into
+the executable — that is what `PublishSingleFile` in each application's csproj is for, and
+a project with no native dependency publishes as exactly one file.
+
+NuGet-provided native libraries are the one thing that cannot go inside. Bundling them is
+possible — `IncludeNativeLibrariesForSelfExtract` does it — but they are then unpacked at
+run time into a per-build directory under the user's temp folder, one directory per build,
+and the runtime deletes none of them: an artifact that grows without bound on a machine
+nobody is watching, the same failure the LOGGING retention rule exists to prevent. One
+fewer file to download is not worth that.
+
+So the single executable is earned by **not depending on native libraries**, never by
+hiding them inside the bundle.
+
+- **Keep native dependencies out.** Before taking a NuGet package, check whether it carries native assets: a package that does costs the application its single-file shape for as long as it stays
+- **Remove the ones already there.** A native library the application never reaches is still published — drop it with `ExcludeAssets="all"` on a direct `PackageReference` to the transitive package. Where the library offers a managed implementation of the same function, select it (for example an `AppContext` switch replacing a native networking layer) and exclude the native package
+- **Never enable `IncludeNativeLibrariesForSelfExtract`** — `Directory.Build.props` fails the build when it is set, because nothing ever cleans up the temp directories it creates
+- **A framework can switch self-extraction on by itself, and that settles the question for the whole application.** WinUI 3 does: publishing it as a single file turns on `IncludeAllContentForSelfExtract`, and the executable then unpacks its entire content set — hundreds of files — into the temp folder on every run. An application built on such a framework is not published as a single file at all; the same guard fails the build, and its message names the property that was set
+- **What genuinely cannot be removed ships beside the executable.** A UI framework's rendering engine, a database engine's own binary: publishing writes them next to the executable and nothing is unpacked at run time. Two or three files beside the executable is the accepted cost of keeping such a library; a temp directory per build is not
+- **The installer's file list covers the whole publish output**, never a named executable alone: a list naming only the executable installs a broken application the moment a native dependency appears
 
 ## SERIAL: Sequential Command Execution
 
