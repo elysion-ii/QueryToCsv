@@ -1,9 +1,9 @@
 # Git
 
 Rules for Git write operations and pull request operations, distributed into each
-repository at `docs/rules/git.md`. Read this file together with `standard.md` whenever a
-task commits, creates or updates a branch, or creates, updates, or merges a pull
-request.
+repository at `docs/rules/git.md`. Read this file before implementing any change, as
+`standard.md` How to use these rules directs, and consult it again before every commit,
+branch, push, and pull request.
 
 ## Confirming Scope
 
@@ -25,9 +25,12 @@ ready.
 
 ## Operation Language
 
+Git text is typed back into shell commands — branch names into `git checkout`, messages
+into `-m`, tags into `git push`. Non-ASCII text there is a standing source of mistakes:
+mistyped names, pathspecs that match nothing, garbled output. English is also the common
+language of the tooling and of everyone who reads the history.
+
 - Write all Git-related text in English by default: commit messages, branch names, PR titles and descriptions, tags, and the like
-- If the application rules file specifies another language (e.g., Japanese), follow it instead
-- When no language is specified, English is the default
 
 ## Commit Format
 
@@ -37,7 +40,6 @@ ready.
 ## Branches
 
 - Treat the default branch as protected, whether or not the repository actually enforces it: never commit on it. Create a branch first, from the default branch's current state. Work on the default branch only when the user explicitly asks for it
-- A repository that works directly on the default branch says so in its application rules file; follow that instead
 - Branch names are kebab-case and describe the change; a type prefix mirroring the commit type (`feat/`, `fix/`, `docs/`, `chore/`, ...) is recommended, not required
 - A branch carries as many commits as the work needs — one PR does not mean one commit
 - Delete branches per Branch Cleanup below once their PR is merged
@@ -50,7 +52,7 @@ ready.
 
 ## Merge Strategy
 
-- Merge PRs with `--squash` by default; use `--merge` / `--rebase` only when explicitly instructed or specified by the application rules file
+- Merge PRs with `--squash` by default; use `--merge` / `--rebase` only when explicitly instructed
 
 ## Squash Commit Message Composition
 

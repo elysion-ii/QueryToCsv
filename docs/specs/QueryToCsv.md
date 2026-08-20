@@ -242,6 +242,9 @@ A query returning zero rows is not an error: the file is written and the run exi
 - Memory use is independent of result-set size: rows are streamed, not buffered.
 - Ships as a self-contained single-file x64 Windows executable; no runtime installation
   is required on the target machine.
+- Running the executable leaves nothing behind outside the application's own folders: it
+  unpacks no content into the temp folder, so repeated releases do not accumulate
+  undeleted directories there.
 - The installer places the application per-user and needs no administrator rights; an
   upgrade replaces the executable and preserves the existing `appsettings.json`.
 

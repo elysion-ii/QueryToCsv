@@ -11,9 +11,8 @@ text here. On conflict, this file wins.
 
 ## Repository Language
 
-- This is a public repository. English is the primary language for everything the
-  repository publishes: console output and other user-facing strings, code comments,
-  documentation, and commit messages
+- This is a public repository. English is the language it publishes in: console output,
+  every other user-facing string, and all documentation
 - `AGENTS.md`, this file, and all other agent instruction files in this repository are
   written in **English only**
 - Keep rules concise and declarative. Do NOT include concrete code examples unless
@@ -26,9 +25,6 @@ text here. On conflict, this file wins.
   out-of-scope keyword remains. A change that widens what the tool may execute is a
   specification change first (`docs/specs/QueryToCsv.md`), never an inline relaxation of
   the keyword list
-- **Never commit a real `appsettings.json`.** It carries connection strings and is
-  gitignored; `QueryToCsv/appsettings.sample.json` is the only configuration file in the
-  repository, and every value in it stays a placeholder
 
 ## Release Constraints
 

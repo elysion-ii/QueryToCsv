@@ -33,14 +33,14 @@ Pre-built binaries are available on the [Releases](https://github.com/elysion-ii
 
 ### 1. Build (from source)
 
-Run `build/Menu.bat` and select **Build** from the menu. This produces a self-contained executable in `build/QueryToCsv/`. The build runs a code format check and the test suite first, and stops if either fails.
+Run `build/Menu.bat` and select **Build** from the menu. This produces a self-contained executable in `build/QueryToCsv/`. The build runs a configuration-file check, a code format check, and the test suite first, and stops if any of them fails.
 
 ### 2. Configure
 
-Copy `appsettings.sample.json` to `appsettings.json` in the same directory as the executable, then edit the connection string and paths.
+Copy `appsettings.template.json` to `appsettings.json` in the same directory as the executable, then edit the connection string and paths.
 
 ```
-copy appsettings.sample.json appsettings.json
+copy appsettings.template.json appsettings.json
 ```
 
 #### Connection Strings

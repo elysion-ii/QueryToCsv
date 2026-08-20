@@ -5,6 +5,11 @@ using NLog.Config;
 using NLog.Targets;
 using QueryToCsv;
 
+// Native SNI.dll is not published (see docs/rules/dotnet.md, NATIVEDEP), so SqlClient
+// must be switched to its managed networking stack before it opens its first connection.
+const string ManagedNetworkingSwitch = "Switch.Microsoft.Data.SqlClient.UseManagedNetworkingOnWindows";
+AppContext.SetSwitch(ManagedNetworkingSwitch, true);
+
 var (invocation, parseError) = CliInvocation.Parse(args);
 if (parseError is not null)
 {
@@ -40,7 +45,7 @@ if (runArgs is not null)
     }
 }
 
-var logger = ConfigureNLog(30);
+var logger = ConfigureNLog(AppSettings.DefaultLogRetentionDays);
 logger.Info($"Application started (v{ApplicationVersion.ProductVersion})");
 
 try
@@ -283,7 +288,7 @@ static int HandleOpen(string target)
             isFile = true;
             break;
         case "log":
-            path = Path.Combine(baseDir, "logs");
+            path = Path.Combine(baseDir, AppPaths.LogFolderName);
             isFile = false;
             break;
         default:
@@ -329,7 +334,7 @@ static int HandleOpen(string target)
 
 static Logger ConfigureNLog(int maxArchiveDays)
 {
-    var logDir = Path.Combine(AppContext.BaseDirectory, "logs");
+    var logDir = Path.Combine(AppContext.BaseDirectory, AppPaths.LogFolderName);
 
     var config = new LoggingConfiguration();
 
@@ -349,4 +354,9 @@ static Logger ConfigureNLog(int maxArchiveDays)
 
     LogManager.Configuration = config;
     return LogManager.GetCurrentClassLogger();
+}
+
+static class AppPaths
+{
+    public const string LogFolderName = "logs";
 }

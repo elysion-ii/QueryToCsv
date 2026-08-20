@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build EXE
+        run: pwsh build/Build.ps1
+
+      - name: Build Installer
+        run: pwsh build/Installer.ps1
+
+      # The release notes are this version's CHANGELOG.md section, so the published
+      # notes and the changelog never drift apart.
+      - name: Extract release notes
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          $heading = '^## \[' + [regex]::Escape($version) + '\].*?$'
+          $pattern = '(?ms)' + $heading + '(.*?)(?=^## |\z)'
+          $found = [regex]::Match((Get-Content CHANGELOG.md -Raw), $pattern)
+          if (-not $found.Success) { throw "CHANGELOG.md has no section for $version" }
+          $found.Groups[1].Value.Trim() | Set-Content release-notes.md -Encoding utf8
+          Get-Content release-notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          files: |
+            build/QueryToCsv/QueryToCsv.exe
+            build/Installer/QueryToCsv-Setup-*.exe

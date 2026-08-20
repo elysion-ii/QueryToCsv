@@ -6,6 +6,7 @@
       "Bash(dotnet test:*)",
       "Bash(dotnet format:*)",
       "Bash(dotnet publish:*)",
+      "Bash(git ls-files:*)",
       "Bash(ls:*)",
       "Bash(find:*)",
       "Bash(grep:*)"

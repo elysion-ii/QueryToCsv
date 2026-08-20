@@ -7,33 +7,23 @@ rules file listed in the repository's `AGENTS.md` Applications table.
 
 ## How to use these rules
 
-This directory holds rule files in two groups: a chain that is always read (this file →
-language files → application rules), and task-specific rule files read only for the
-matching kind of work.
+Read every rule file in this directory before implementing any change, together with
+the rules file and specification of the application being changed — the `AGENTS.md`
+Applications table names both. `cli.md` is the only file that may be skipped, and only
+while that application exposes no command-line interface (neither a console application
+nor a GUI application that accepts command-line options). Judging any other file
+unrelated to the work at hand and leaving it unread is how a rule goes unapplied.
 
-1. Read this file.
-2. Read every language file in this directory that matches the project's technology
-   stack (a .NET repository reads `dotnet.md`; a multi-stack repository reads all
-   matching files). The repository's `AGENTS.md` states the stack and the concrete
-   commands (formatter, build, test). When the application being changed exposes a
-   command-line interface — a console application, or a GUI application that accepts
-   command-line options — also read `cli.md`; it applies regardless of stack and sits
-   at the same precedence level as the language files.
-3. Identify the application being changed in the `AGENTS.md` Applications table, then
-   read its rules file and its specification (`docs/specs/...`).
-4. Each language file begins with an **enforcement matrix** stating which rules the
-   project scaffold enforces mechanically (analyzers, build gates) and which must be
-   checked by AUDIT.
-5. Precedence on conflict within this always-read chain: the more specific file wins —
-   application rules > language rules and `cli.md` > this file. `AGENTS.md` holds no
-   rule text; it only routes.
-6. Two more rule files in this directory are task-specific, outside the chain above,
-   and read in addition only when that kind of work is underway: `documentation.md`
-   when creating, changing, moving, renaming, archiving, or deleting any document;
-   `git.md` for any Git write operation or PR operation. `AGENTS.md` states when each
-   applies.
-7. Before reporting an implementation task as complete, run **AUDIT** (bottom of this
-   file).
+- A repository reads the language files matching its technology stack — a .NET
+  repository reads `dotnet.md`, a multi-stack repository reads every matching file. Its
+  `AGENTS.md` states the stack and the concrete commands (formatter, build, test).
+- Each language file begins with an **enforcement matrix** stating which rules the
+  project scaffold enforces mechanically (analyzers, build gates) and which must be
+  checked by AUDIT.
+- Precedence on conflict: the more specific file wins — application rules > language
+  rules and `cli.md` > this file. `AGENTS.md` holds no rule text; it only routes.
+- Before reporting an implementation task as complete, run **AUDIT** (bottom of this
+  file).
 
 ---
 
@@ -65,6 +55,9 @@ matching kind of work.
 
 ### No Lasagna Code
 
+A layer that adds no behavior still has to be read, navigated, and kept in step with the
+one it forwards to. Layers earn their place by doing something.
+
 - Do not create pass-through delegation methods that just call another service with the same arguments
 - When extracting shared logic into a new service, update **all** callers to use the new service directly
 - Do not leave wrapper methods on the original class
@@ -75,6 +68,9 @@ matching kind of work.
 - If sharing would require flags or parameters that grow with each new caller, stop sharing
 
 ### Change as Addition
+
+Adding the tenth variation should cost what the second one cost. It stops costing that as
+soon as a variation means editing branches spread across existing code.
 
 - Prefer structures where adding a variation (new screen, format, identifier) means adding a new unit plus a registration, not editing branches across existing code
 - Health check: count the files that must be edited to add one variation
@@ -187,10 +183,14 @@ If the current code is clear without a comment, write no comment. If the reason 
 
 ## Version Display
 
+The first thing to establish about a reported problem is which build produced it. An
+application that cannot state its own version turns that into guesswork, and every answer
+after it is built on a guess.
+
 - Every application must expose the version it was built with, in the form `AppName X.Y.Z` (e.g., `MyApp 1.22.3`)
 - GUI applications display it somewhere always reachable in the UI (title bar, about screen, footer)
 - CLI applications provide `--version` / `-V`; the concrete requirements are in `cli.md`
-- The default format is the bare product version — no build hash, build date, or other metadata. The application rules file may override the format (e.g., to append a build identifier); without such an override, the simple form applies
+- The default format is the bare product version — no build hash, build date, or other metadata
 - The displayed value comes from the project's single version definition (see the language file's version-management rules), never from a hardcoded string
 
 ---
@@ -206,6 +206,17 @@ files, environment variables, and any other external store.
 - **Externalizing a value is a choice**: a value nobody adjusts in the field stays a named constant in code (see the language file's constants rule). Making it configurable adds the obligations above
 - This does not relax Enforce Invariants in Code — that rule governs values the program itself produces, where a violation is a defect and must fail fast. An external value is operator input: the program keeps running on a known-good value and reports what it rejected
 - Precedence between sources, for applications that expose a command line, is in `cli.md` (CONFIG)
+
+### Configuration Files in the Repository
+
+Applies to every configuration file that ships with the application — application
+settings, deployment descriptors, workflow definitions, and the like.
+
+- **The repository tracks a placeholder template, never a working configuration.** The tracked file is `<name>.template.<ext>` and carries placeholder values only; the file the application actually reads is derived from it and stays untracked. A working configuration holds the credentials, host names, and paths of whoever wrote it — committing one leaks them and makes every other environment inherit them
+- **A developer's own configuration is local to that developer.** Derive it from the template, keep it out of version control, and never treat it as a source of truth for anyone else
+- **What ships is derived from the template by the build**, so the distributed file is placeholder-clean by construction. Distribution never picks up a configuration file that happened to be sitting in a working tree
+- **Installation never overwrites an existing configuration.** The derived file is written only when none is present, so updating an installation keeps what the operator configured
+- The template is a real, complete configuration in shape: every key the application reads appears in it, so the file doubles as the documentation of what is configurable
 
 ---
 

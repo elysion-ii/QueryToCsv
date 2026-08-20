@@ -4,6 +4,8 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>QueryToCsv</RootNamespace>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,6 +14,16 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.*" />
     <PackageReference Include="CsvHelper" Version="33.*" />
     <PackageReference Include="NLog" Version="5.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Microsoft.Data.SqlClient pulls in two native libraries that this application
+         never reaches: SNI.dll is replaced by the managed networking stack Program.cs
+         selects, and msalruntime.dll serves Entra interactive authentication, which is
+         out of scope. Excluding both keeps the publish output a single executable
+         (see docs/rules/dotnet.md, NATIVEDEP). -->
+    <PackageReference Include="Microsoft.Data.SqlClient.SNI.runtime" Version="6.0.2" ExcludeAssets="all" />
+    <PackageReference Include="Microsoft.Identity.Client.NativeInterop" Version="0.20.6" ExcludeAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
