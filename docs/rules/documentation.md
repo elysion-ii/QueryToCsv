@@ -1,7 +1,7 @@
 # Documentation
 
-Rules for classifying, placing, naming, and retiring every non-source document in a
-repository — specs, guides, references, ADRs, investigations, notes, and the rest.
+Rules for writing, classifying, placing, naming, and retiring every non-source document
+in a repository — specs, guides, references, ADRs, investigations, notes, and the rest.
 Read this file before implementing any change, as `standard.md` How to use these rules
 directs, and consult it again whenever a task creates, changes, moves, renames,
 archives, or deletes a document, or when it is unclear where a new one belongs. Do not
@@ -24,6 +24,14 @@ classify or name documents from memory.
 - `docs/references/` records a durable fact consulted during work.
 - `docs/investigations/`, `docs/notes/`, `docs/plans/`, `docs/inbox/`, and `docs/archive/` each have one distinct purpose — see Category notes below; do not blend them.
 - Content that defines a correct input/output pair belongs in test code (table-driven), not in a document.
+
+## Writing
+
+Applies to the body of every document in this tree.
+
+- **State the what and the why before the how.** Cover the 5W1H the subject actually needs — what, why, who, when, where, how. Which of them matter varies by category; the ones that do are written down rather than left to be inferred from the surrounding text
+- **Re-read a finished draft for means presented as ends.** A document drifts there while it is being written: the mechanism gets named where the property belongs, and a tool or a threshold stands in for the criterion it was chosen to serve. State the property or the criterion first, then the mechanism that currently satisfies it
+- **A number belongs in a document when it is the criterion**, never when it stands in for one. A version, a limit the system enforces, or a default stated together with the condition for departing from it is a criterion; a quantity offered as an illustration of an acceptable cost is not, and it will be read as a threshold it was never meant to be
 
 ## Directory layout
 
@@ -109,8 +117,8 @@ differ between categories. Use the same application identifier in every category
 
 ## Front matter
 
-Every document carries front matter with at least `created` and `status`. Four
-exemptions: repository-root entry files (`README.md`, `CHANGELOG.md`), which face
+Every document carries front matter with at least `created` and `status`. The
+exemptions are: repository-root entry files (`README.md`, `CHANGELOG.md`), which face
 external readers and tooling that expect them to open with their content;
 in-progress plans under `docs/plans/` (front matter is added when archived);
 ADRs, which do **not** carry `created` — the sequence number and git history already

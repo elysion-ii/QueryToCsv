@@ -24,7 +24,7 @@ checks them.
 | SYNTAX | `app [global-options] <command> [command-options] [arguments]` | — | AUDIT |
 | OPTIONS | Long form for every option; short forms only for frequent options | — | AUDIT |
 | RESERVED | `--version`/`-V` is mandatory; `--help`/`-h`, `-v`, `-q` are reserved names | — | AUDIT — scaffolds may seed the implementation; nothing guards its removal |
-| VERSIONOUT | `--version` prints `appname X.Y.Z` — bare version, no build metadata | The stack's version-management rules keep the source value clean (e.g., `dotnet.md` VERSION) | AUDIT |
+| VERSIONOUT | `--version` prints `<AppName> X.Y.Z` — bare version, no build metadata | The stack's version-management rules keep the source value clean (e.g., `dotnet.md` VERSION) | AUDIT |
 | SUBCOMMANDS | Subcommand structure, naming, and cross-command consistency | — | AUDIT |
 | HELP | Help content and per-level `--help` | — | AUDIT |
 | STREAMS | Results to stdout; logs, progress, warnings, and errors to stderr | — | AUDIT |
@@ -105,7 +105,7 @@ one:
 
 ## VERSIONOUT: Version Output
 
-- `--version` prints a single line: the application's name, a space, and the product version — `appname 1.22.3`. When the command name differs from the application name, the application name is printed — the same name a GUI would display (Version Display in `standard.md`)
+- `--version` prints a single line: the application's name, a space, and the product version — `MyApp 1.22.3`. When the command name differs from the application name, the application name is printed — the same name a GUI would display (Version Display in `standard.md`)
 - Default format is the bare product version only: no build hash, build date, commit id, or other metadata
 - The value comes from the project's single version definition (see the language file's version-management rules, e.g., `dotnet.md` VERSION), never from a hardcoded string
 - This is the CLI shape of the Version Display rule in `standard.md`; GUI display requirements are stated there
@@ -147,7 +147,7 @@ The `--help` output contains:
 2. Usage (`Usage: app <command> [options]`)
 3. The subcommand list (when subcommands exist)
 4. The option list (short form, long form, description)
-5. One to three representative usage examples (when an example shows more than the usage line already does — a leaf command with no arguments or options needs none)
+5. Representative usage examples (when an example shows more than the usage line already does — a leaf command with no arguments or options needs none)
 
 ### Behavior without arguments
 
@@ -201,7 +201,7 @@ Precedence, strongest first:
 ## COMPAT: Compatibility
 
 - Avoid incompatible changes to published option names, subcommand names, and exit-code meanings
-- When a rename is warranted, replace the old name outright — no deprecation period, no warning phase, no old-name alias
+- When a rename is warranted, replace the old name outright — no deprecation period, no warning phase, no old-name alias. An alias doubles the surface that has to keep working, and leaves the help unable to say which name is the current one
 - To guarantee machine-readable output, provide `--format json` and state that the plain-text output's stability is not guaranteed
 
 ## Checklist
@@ -209,7 +209,7 @@ Precedence, strongest first:
 Before publishing a new CLI, confirm:
 
 - [ ] `--version` / `-V` works (and `--help` / `-h`, when implemented)
-- [ ] `--version` prints `appname X.Y.Z` with no build metadata
+- [ ] `--version` prints `<AppName> X.Y.Z` with no build metadata
 - [ ] Every option has a long form
 - [ ] Everything after `--` is treated as arguments
 - [ ] `--help`, when implemented, works under each subcommand

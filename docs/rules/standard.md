@@ -73,7 +73,6 @@ Adding the tenth variation should cost what the second one cost. It stops costin
 soon as a variation means editing branches spread across existing code.
 
 - Prefer structures where adding a variation (new screen, format, identifier) means adding a new unit plus a registration, not editing branches across existing code
-- Health check: count the files that must be edited to add one variation
 
 ### Enforce Invariants in Code
 
@@ -102,7 +101,7 @@ Even a justified comment is capped at a short conclusion (1–2 lines):
 
 - Check Enforce Invariants in Code first — a constraint that types or a fail-fast check can enforce needs neither a comment nor an ADR
 - When an ADR covers the context, the comment states only the conclusion plus the ADR path
-- A comment that would exceed ~3 lines is the signal that its body belongs in an ADR or `docs/references/` — move the body there and leave a one-line pointer
+- Context that does not fit in those two lines is document-sized: its body belongs in an ADR or `docs/references/`, with a one-line conclusion plus the path left at the site. Add it to the document that already covers the subject; a new file is warranted only when the context stands on its own as a decision or a durable fact
 
 Before writing a comment, ask:
 
@@ -187,7 +186,8 @@ The first thing to establish about a reported problem is which build produced it
 application that cannot state its own version turns that into guesswork, and every answer
 after it is built on a guess.
 
-- Every application must expose the version it was built with, in the form `AppName X.Y.Z` (e.g., `MyApp 1.22.3`)
+- Every application must expose the version it was built with, in the form `<AppName> X.Y.Z` (e.g., `MyApp 1.22.3`)
+- `<AppName>` is the application's own name, spelled as the application spells it — the GUI and the CLI print the identical string
 - GUI applications display it somewhere always reachable in the UI (title bar, about screen, footer)
 - CLI applications provide `--version` / `-V`; the concrete requirements are in `cli.md`
 - The default format is the bare product version — no build hash, build date, or other metadata
