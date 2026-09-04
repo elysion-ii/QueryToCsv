@@ -29,6 +29,9 @@ csharp_style_var_when_type_is_apparent = true:suggestion
 csharp_style_var_for_built_in_types = false:suggestion
 csharp_style_var_elsewhere = false:suggestion
 
+# DEFERRED: a second enumeration of an IEnumerable re-runs the whole query
+dotnet_diagnostic.CA1851.severity = warning
+
 # Usings: outside namespace, System directives first
 csharp_using_directive_placement = outside_namespace:warning
 dotnet_sort_system_directives_first = true
