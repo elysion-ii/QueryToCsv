@@ -9,6 +9,23 @@ to build an installer for a version that has no heading here.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-04
+
+### Added
+
+- The installer handles QueryToCsv being open. An upgrade closes the running application
+  and starts it again once the files are replaced; an uninstall offers to close it, to
+  re-check after you have closed it yourself, or to cancel and leave QueryToCsv
+  installed. Nothing is closed forcibly, and an unattended uninstall closes the
+  application and continues.
+
+### Changed
+
+- Development rules adopt dev-standards v4.16.0: `docs/rules/standard.md` and
+  `docs/rules/dotnet.md` gain the declarative-form and deferred-execution rules, and
+  `.editorconfig` turns a second enumeration of an `IEnumerable` (CA1851) into a build
+  error.
+
 ## [2.0.0] - 2026-07-30
 
 ### Added
