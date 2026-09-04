@@ -46,6 +46,19 @@ unrelated to the work at hand and leaving it unread is how a rule goes unapplied
 - Keep I/O in a thin shell that orchestrates: fetch → decide (pure) → write
 - Time, randomness, and environment values are inputs too: pass them as arguments; introduce clock abstractions or DI only when argument-passing is not enough
 
+### Declarative Where It Removes Machinery
+
+Neither form is better by default. A query pipeline is not safer than a loop, and a loop
+is not clearer than a pipeline. What decides it is how much the reader has to hold in
+their head, and that is visible.
+
+- Write the transformation declaratively when doing so **removes** machinery that carries no meaning: a mutable accumulator, an index, a nesting level, an append call. What remains is the transformation the reader came for — filter, map, group, sort
+- Keep the loop when the declarative form **adds** machinery to force the logic into a shape it does not have: a tuple accumulator standing in for mutable state, extra traversals to produce what one traversal already produced, a fold whose body is the loop body with its state spelled out
+- The test is not "which is simpler". Simplicity is a judgement about the reader, and the writer is a poor judge of it. The test is whether the rewrite subtracted mechanism or added it, which anyone can check
+- Control flow is machinery a declarative form usually adds rather than removes: early exit with a reason, per-item error handling, cancellation checks, state that depends on the previous element. These stay imperative
+- Performance justifies keeping the form that reads worse **only with a measurement behind it**. Without one, write the form that removes machinery: an unmeasured belief about speed is not a reason to make code harder to read
+- This rule governs the inside of a function. Which side of the boundary code sits on — pure decision or effectful shell — is Functional Core, Imperative Shell above, and it wins where the two meet: the shell is a sequence of steps and stays one
+
 ### Snapshot Before Mutate
 
 - Never modify a data source while lazily iterating over it. This applies to any deferred/streaming enumeration in any language: directory listings (e.g., C# `Directory.EnumerateFiles`, Python `os.scandir`, POSIX `readdir`), collections under `foreach`, DB cursors, lazy queries (LINQ, generators)
@@ -117,6 +130,7 @@ Good comments explain current constraints that code cannot show:
 - External constraints such as API limits, protocol requirements, or legacy system behavior
 - Invariants, ordering requirements, and exceptional states
 - Non-obvious guards that are required only in specific runtime states
+- Why the code has a shape a reader would not have chosen, when a measured result rejected the shape they would have chosen. State the measurement — that is what makes the comment checkable later, and deletable when the measurement stops holding
 
 ```csharp
 // config is null only on first launch (before the settings file is generated)
@@ -124,6 +138,9 @@ if (config != null) { ... }
 
 // The contractual matching key is aaa only; extra conditions drop update history (rationale: docs/adr/0002-order-matching-key.md)
 var sql = "SELECT ... FROM [Order_TBL] WHERE aaa = @bbb";
+
+// Three passes over 200k rows cost 400ms; one pass keeps the report inside its 1s budget
+var count = 0; var sum = 0m; var max = decimal.MinValue;
 ```
 
 ### Do Not Write
@@ -135,6 +152,7 @@ Do not write comments that explain the work history instead of the current const
 - Notes like "X removed", "X excluded", "changed after review", or "aligned with screen Y"
 - Comments that only restate the next line of code
 - Bare prohibitions without the current reason
+- Performance claims with nothing measured behind them ("for performance", "this is faster") — without the number, the claim cannot be checked, cannot be refuted, and no one dares delete it
 
 If the current code is clear without a comment, write no comment. If the reason matters, explain the reason as a current rule or constraint without preserving removed implementation details.
 

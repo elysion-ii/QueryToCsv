@@ -19,6 +19,7 @@ mechanism is added.
 | ANALYZERS | Static analysis, warnings are errors | `Directory.Build.props`: `AnalysisLevel=latest-recommended`, `EnforceCodeStyleInBuild`, `TreatWarningsAsErrors` | Enforced |
 | NAMESPACE | File-scoped namespaces only | `.editorconfig` (`csharp_style_namespace_declarations=file_scoped:warning`) + warnings-as-errors | Enforced |
 | ASYNC | No blocking on async code; no async without await | VSTHRD analyzers (`Microsoft.VisualStudio.Threading.Analyzers`); CS1998 as error | Enforced |
+| DEFERRED | A LINQ query is deferred: no side effects inside a query, enumerate once, exceptions surface at enumeration | `.editorconfig` sets `dotnet_diagnostic.CA1851.severity = warning`, which `TreatWarningsAsErrors` turns into a build error | Enforced for multiple enumeration — side effects inside a query and the placement of `try` have no analyzer and stay AUDIT |
 | VAR | Type inference usage | `.editorconfig` suggestions only | AUDIT |
 | STRING | Explicit `StringComparison` | — | AUDIT |
 | ERROR | Error handling | — | AUDIT |
@@ -33,6 +34,7 @@ mechanism is added.
 | OUTPUT | Build outputs come only from the build scripts; never manual, never committed | Output directories are gitignored by the scaffold; `Build.ps1` gates publishing on the format check and the test suite | AUDIT — gitignore keeps outputs out of normal staging; it does not stop forced adds, manual additions, or hand-run publishing |
 | CONFIGFILE | Only the placeholder template of a configuration file is tracked; the file the application reads is never committed | `Build.ps1` derives the real name of every tracked `*.template.*` configuration file and fails when git tracks it; the scaffold gitignores `appsettings.json` | Enforced for the commit — deriving the shipped file and the installer's no-overwrite entry stay AUDIT items |
 | NATIVEDEP | The distributable is as few files as possible, carries no debug symbols, and never unpacks itself at run time; native dependencies are reduced to reach that | `Directory.Build.props` fails the build when `IncludeNativeLibrariesForSelfExtract` is enabled and drops every `.pdb` from the publish list; the installer script ships the whole publish output | Enforced for the property and the symbols — how far the native dependencies are reduced, and keeping the installer's file list exhaustive, stay AUDIT items |
+| RUNNINGAPP | Installing over, and uninstalling, a running application is handled: the processes are detected, the user is offered a way to have them closed, and nothing is force-closed on the user's behalf | The installer script sets `CloseApplications=yes` for the update path and drives the Restart Manager from `InitializeUninstall` for the uninstall path | AUDIT — the scaffold ships the mechanism, but nothing fails when an installer script drops it |
 | SERIAL | One dotnet command at a time per solution | — | AUDIT — behavioral: observed at command-execution time, leaves no file artifact to check |
 
 ---
@@ -63,6 +65,17 @@ Refines the core's Synchronous vs Asynchronous section for .NET:
 - **Never block on async code** (`.Result`, `.Wait()`, `GetAwaiter().GetResult()`) — enforced by the VSTHRD analyzers (`Microsoft.VisualStudio.Threading.Analyzers` in `Directory.Build.props`)
 - **Do not mark a method async when nothing in it awaits** — CS1998 is an error under warnings-as-errors
 - When a suppression is genuinely justified (e.g., a synchronous entry point mandated by a framework), follow the ANALYZERS suppression tiers with a reason comment
+
+## DEFERRED: Deferred Execution (LINQ)
+
+A LINQ query is a description of work, not the work. `foreach` runs; a query waits for
+something to enumerate it. Three failures come out of that gap, and none of them
+announces itself.
+
+- **Never place a side effect inside a query.** `Select`, `Where`, and the rest run when the sequence is enumerated — later than the line that reads as the moment it happens, possibly more than once, possibly never. A save, a log write, or an assignment inside a projection fires at a time nothing in the code shows. Transform in the query; act in a `foreach` over the materialized result
+- **Enumerate once.** A sequence still typed as `IEnumerable<T>` re-runs its whole query on every enumeration, and a query over a database or the file system re-runs that I/O with it. Materialize with `ToList()` or `ToArray()` at the point the sequence stops being a query and becomes data. CA1851 makes a second enumeration a build error
+- **An exception surfaces where the sequence is enumerated, not where the query was written.** A `try` wrapped around the query definition catches nothing at all. Wrap the enumeration, or materialize inside the `try`
+- Materializing is the same act `standard.md` Snapshot Before Mutate requires before modifying the source being iterated: one deferral, seen from the mutation side
 
 ## NAMESPACE: Namespaces
 
@@ -217,6 +230,17 @@ hiding them inside the bundle.
 - **What genuinely cannot be removed ships beside the executable.** A UI framework's rendering engine, a database engine's own binary: publishing writes them next to the executable and nothing is unpacked at run time. However many such files there are, they stay beside the executable — the line is drawn at run-time extraction, not at a file count. A native dependency set large enough to feel uncomfortable is a reason to remove more of it, never a reason to bundle it
 - **The installer's file list covers the whole publish output**, never a named executable alone: a list naming only the executable installs a broken application the moment a native dependency appears
 - **Debug symbols never ship.** `Directory.Build.props` removes every `.pdb` from the publish list, because the installer names nothing and would otherwise package whatever is there. `DebugType=none` reaches only this build's own symbols; a native package carries its own beside its library, and those arrive through the runtime-asset copy that no compiler switch touches. A project that genuinely must ship symbols redefines `RemoveSymbolsFromPublish` as an empty target in its csproj
+
+## RUNNINGAPP: Installing Over and Removing a Running Application
+
+- **The installer handles the application being open**, in both directions: an update that replaces files the running application holds, and an uninstall that deletes them. An uninstaller that ignores this leaves a half-removed installation behind — the executable stays locked on disk while the entry that would have removed it is already gone
+- **The update path uses Inno Setup's own support.** `CloseApplications` (whose default is `yes`) has the Windows Restart Manager detect the processes holding files the install replaces, ask the user, close them, and start them again after the install. The installer script states it explicitly rather than leaning on the default
+- **`AppMutex` is never declared.** It blocks at startup, before the Restart Manager stage is reached, so declaring it replaces "closed and restarted automatically" with "close it yourself and start over". It also applies to Setup and Uninstall together and cannot be limited to uninstall, which is the path that actually needs the help
+- **The uninstall path drives the Restart Manager from `[Code]`**, because Inno Setup's close-applications support covers Setup only and the uninstaller's command line has no switch for it. `InitializeUninstall` registers every `*.exe` under the installation directory except the uninstaller itself, counts the processes using them, and offers three choices: close them and retry, retry after closing them by hand, or cancel the uninstall
+- **Nothing is force-closed on the user's behalf.** `RmShutdown` is called without `RmForceShutdown`; when a graceful shutdown does not take, the choice returns to the user. Forcing a shutdown discards whatever the user has not saved
+- **Only executables are registered, never libraries.** The Restart Manager reports whichever process holds a registered file, so registering a DLL would list the process that loaded it — a shell extension would drag Explorer into the shutdown
+- **A silent uninstall closes the application and continues.** Unattended deployment is what runs one, and stopping there fails the deployment with nothing on screen to explain why
+- **A detection that fails never blocks the uninstall.** When the Restart Manager cannot answer, the uninstall proceeds as it would have without the check — a check that could not run is not grounds for refusing to remove an application
 
 ## SERIAL: Sequential Command Execution
 

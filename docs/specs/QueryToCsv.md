@@ -247,6 +247,14 @@ A query returning zero rows is not an error: the file is written and the run exi
   undeleted directories there.
 - The installer places the application per-user and needs no administrator rights; an
   upgrade replaces the executable and preserves the existing `appsettings.json`.
+- An upgrade performed while QueryToCsv is running reports which processes hold the
+  files it replaces, closes them once the user agrees, and starts them again when the
+  upgrade is finished.
+- An uninstall performed while QueryToCsv is running offers three answers: close it and
+  continue, re-check after the user has closed it by hand, or cancel and leave the
+  application installed. Nothing is closed forcibly. An unattended uninstall closes the
+  application and continues, and an uninstall whose detection cannot run proceeds
+  regardless.
 
 ## Out of Scope
 
