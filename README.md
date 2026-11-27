@@ -47,13 +47,26 @@ copy appsettings.template.json appsettings.json
 
 Define one or more named connections in the `Connections` array. At startup, you choose which connection to use (or it is selected automatically if only one is defined).
 
-**SQL Server Authentication** (username and password):
+Connection names must be unique (ignoring case). Every connection is encrypted and the
+server's certificate is validated: a connection string that sets
+`TrustServerCertificate=True` or turns encryption off is rejected at startup. A server
+whose certificate does not chain to a trusted root can be pinned with
+`Server Certificate=<path to its .cer file>`.
+
+**SQL Server Authentication** (user name and password from Windows Credential Manager):
+
+The connection string never holds the user name or password. Store them once for the
+Windows account that runs QueryToCsv, then name that credential in `Credential`:
+
+```
+cmdkey /generic:"QueryToCsv/Dev Server" /user:myuser /pass
+```
 
 ```json
 {
   "Connections": [
-    { "Name": "Dev Server", "ConnectionString": "Server=192.168.1.10;Database=SalesDB;User Id=myuser;Password=mypassword;TrustServerCertificate=True;" },
-    { "Name": "Prod Server", "ConnectionString": "Server=sql-prod.local;Database=OrderDB;User Id=myuser;Password=mypassword;TrustServerCertificate=True;" }
+    { "Name": "Dev Server", "ConnectionString": "Server=192.168.1.10;Database=SalesDB;Encrypt=Mandatory;", "Credential": "QueryToCsv/Dev Server" },
+    { "Name": "Prod Server", "ConnectionString": "Server=sql-prod.local;Database=OrderDB;Encrypt=Mandatory;Server Certificate=C:\\certs\\sql-prod.cer;", "Credential": "QueryToCsv/Prod Server" }
   ]
 }
 ```
@@ -63,16 +76,17 @@ Define one or more named connections in the `Connections` array. At startup, you
 ```json
 {
   "Connections": [
-    { "Name": "Local", "ConnectionString": "Server=myserver;Database=mydb;Integrated Security=True;TrustServerCertificate=True;" }
+    { "Name": "Local", "ConnectionString": "Server=myserver;Database=mydb;Integrated Security=True;Encrypt=Mandatory;" }
   ]
 }
 ```
 
-> With Windows Authentication, `User Id` and `Password` are not needed. The tool connects using the credentials of the Windows user running the application.
+> The SELECT-only check guards against mistakes, not against someone who means to write:
+> give the database account read permission only.
 
 ### 3. Add SQL Files
 
-Place `.sql` files in the `queries/` folder (or whichever folder `QueryFolder` points to). Each file holds exactly one SELECT statement, optionally preceded by `WITH` common table expressions. Anything else is rejected before it reaches the server: a data-modifying statement, `SELECT ... INTO`, a second statement or a `GO`-separated batch, or a read through `OPENROWSET`, `OPENQUERY`, or `OPENDATASOURCE`.
+Place `.sql` files in the `queries/` folder (or whichever folder `QueryFolder` points to). Each file holds exactly one SELECT statement, optionally preceded by `WITH` common table expressions. Anything else is rejected before it reaches the server: a data-modifying statement, `SELECT ... INTO`, a second statement or a `GO`-separated batch, a read through `OPENROWSET`, `OPENQUERY`, `OPENDATASOURCE`, or a linked server (`server.database.schema.table`), or `NEXT VALUE FOR`. A `.sql` file is limited to 4 MiB and its text to 1,048,576 characters; a byte that is invalid in `SqlFileEncoding` is reported with its offset instead of being replaced.
 
 ### 4. Run
 
@@ -82,7 +96,7 @@ QueryToCsv.exe
 
 ### Cancelling
 
-To exit the application at any time, press **Ctrl+C**.
+Press **Ctrl+C** to cancel a run at any time: the query is cancelled, no CSV is written, and the run exits with code 1.
 
 At any input prompt, **Ctrl+Z** followed by Enter also exits (exit code 1). Exception: in direct SQL input mode, Ctrl+Z ends the SQL entry and proceeds with execution instead of quitting.
 
@@ -147,7 +161,7 @@ The `--open` option opens folders or files directly from the command line, usefu
 QueryToCsv --open queries              # Open queries folder in Explorer
 QueryToCsv --open output               # Open output folder in Explorer
 QueryToCsv --open config               # Open appsettings.json in default editor
-QueryToCsv --open log                  # Open logs folder in Explorer
+QueryToCsv --open log                  # Open the folder log files are written to
 QueryToCsv --open "C:\path\to\file.csv"  # Open a specific file with its default app
 ```
 
@@ -222,16 +236,17 @@ All settings are in `appsettings.json`.
 |-----|------|----------|---------|-------------|
 | `Connections[]` | array | Yes | - | Array of named connection entries |
 | `Connections[].Name` | string | Yes | - | Display name shown in the selection menu |
-| `Connections[].ConnectionString` | string | Yes | - | SQL Server connection string |
+| `Connections[].ConnectionString` | string | Yes | - | SQL Server connection string, without user name or password, with encryption and certificate validation on |
+| `Connections[].Credential` | string | No | - | Windows Credential Manager generic credential holding the SQL Server user name and password |
 | `QueryFolder` | string | No | `queries` next to the executable | Folder containing `.sql` files |
 | `OutputFolder` | string | No | `output` next to the executable | Folder for CSV output |
-| `QueryTimeout` | int | No | `30` | Query timeout in seconds (must be > 0) |
+| `QueryTimeout` | int | No | `30` | Query timeout in seconds, 1 to 2147483647 |
 | `SqlFileEncoding` | string | No | `"UTF-8"` | Encoding for reading `.sql` files |
-| `LogRetentionDays` | int | No | `30` | Number of days to keep log files |
-| `CsvSettings.Delimiter` | string | No | `","` | Single character. Use `"\t"` for tab |
+| `LogRetentionDays` | int | No | `30` | Number of days to keep log files, 1 to 3650 |
+| `CsvSettings.Delimiter` | string | No | `","` | Single character other than `"`, a line break, or a space. Use `"\t"` for tab |
 | `CsvSettings.NullValue` | string | No | `""` | String to output for SQL NULL values |
 | `CsvSettings.NewLine` | string | No | `"CRLF"` | `"CRLF"` or `"LF"` |
-| `CsvSettings.DateFormat` | string | No | `null` | Date format string (e.g. `"yyyy-MM-dd HH:mm:ss"`) |
+| `CsvSettings.DateFormat` | string | No | `null` | .NET date format string (e.g. `"yyyy-MM-dd HH:mm:ss"`) replacing the ISO 8601 default |
 
 ### Path Resolution
 
@@ -251,8 +266,8 @@ default.
 ```json
 {
   "Connections": [
-    { "Name": "Dev Server", "ConnectionString": "Server=192.168.1.10;Database=SalesDB;User Id=myuser;Password=mypassword;TrustServerCertificate=True;" },
-    { "Name": "Prod Server", "ConnectionString": "Server=sql-prod.local;Database=OrderDB;Integrated Security=True;TrustServerCertificate=True;" }
+    { "Name": "Dev Server", "ConnectionString": "Server=192.168.1.10;Database=SalesDB;Encrypt=Mandatory;", "Credential": "QueryToCsv/Dev Server" },
+    { "Name": "Prod Server", "ConnectionString": "Server=sql-prod.local;Database=OrderDB;Integrated Security=True;Encrypt=Mandatory;" }
   ],
   "QueryFolder": "./queries",
   "OutputFolder": "./output",
@@ -284,16 +299,19 @@ For direct input mode, the query name is omitted and the file is named `{timesta
 20260302_153045.csv
 ```
 
-If a file with the same name already exists, a suffix is appended: `_2`, `_3`, etc.
+The timestamp is the machine's local time. If a file with the same name already exists, a suffix is appended: `_2`, `_3`, etc. An existing file is never overwritten, and two runs that finish at the same second both succeed with different names. The CSV is assembled in `%TEMP%\QueryToCsv` and appears in `OutputFolder` only when complete.
 
 ### Format
 
 - **Standard**: RFC 4180 compliant
-- **Quoting**: Fields containing the delimiter, newlines, or double quotes are enclosed in double quotes
+- **Quoting**: Fields containing the delimiter, a double quote, a carriage return, or a line feed, or beginning or ending with a space, are enclosed in double quotes
 - **Escaping**: Double quotes within fields are escaped as `""`
-- **Numbers**: Formatted with `InvariantCulture` (decimal point `.`, no thousands separator)
-- **Dates**: Formatted with `DateFormat` if specified, otherwise `InvariantCulture` default
+- **Numbers**: Invariant culture (decimal point `.`, no thousands separator); `decimal` keeps its scale, `float` uses the shortest round-trip form (`1E+20`)
+- **Dates**: ISO 8601 — `yyyy-MM-dd` for `date`, `yyyy-MM-ddTHH:mm:ss.fffffff` for `datetime`/`datetime2`, with the offset for `datetimeoffset` — unless `DateFormat` is set
+- **Other types**: `bit` as `1`/`0`, binary as `0x` + hexadecimal, `uniqueidentifier` in lowercase; CLR types such as `hierarchyid` must be converted in the query
+- **Formula triggers**: text beginning with `=`, `+`, `-`, `@`, a tab, or a carriage return gets a leading `'` so spreadsheets do not evaluate it
 - **NULL**: Replaced with the configured `NullValue` (empty string by default)
+- **Unrepresentable characters**: a character the chosen encoding cannot hold ends the run naming its row and column; nothing is replaced
 - **Empty results**: Outputs header-only CSV (if headers enabled) or an empty file
 
 ### Encoding Options
@@ -312,10 +330,14 @@ If a file with the same name already exists, a suffix is appended: `_2`, `_3`, e
 | `appsettings.json` missing or unparseable | Reported as a warning; the run continues on the built-in defaults |
 | Unusable config value | Reported as a warning naming the setting and the default applied; the run continues |
 | No connection configured | `QueryToCsv: Connections must contain at least one entry.`, exit code 1 |
-| Connection entry left incomplete | `QueryToCsv: Connections[<index>].Name is required.` (or `.ConnectionString`), exit code 1 |
+| Connection entry incomplete, duplicated, or unsafe | `QueryToCsv: Connections[<index>]...` naming the problem (missing name or connection string, reused name, invalid connection string, `TrustServerCertificate`, encryption off, user name or password in the string), exit code 1 |
+| `Credential` not in Windows Credential Manager | `QueryToCsv: credential "<name>" was not found in Windows Credential Manager.`, exit code 1 |
 | `QueryFolder` does not exist | Reported as a warning; `queries` next to the executable is used |
 | No `.sql` files found | Only "Enter query directly" (option 0) is shown; direct input is still available |
 | `OutputFolder` does not exist | Automatically created |
+| `OutputFolder` cannot be written | `QueryToCsv: cannot write the output file in "<folder>".`, exit code 1 |
+| `-f` relative path leaving `QueryFolder` | Usage error with a `--help` hint, exit code 2 |
+| Ctrl+C | `QueryToCsv: cancelled.`, exit code 1 |
 | Connection or SQL execution failure | `QueryToCsv: query execution failed.`, exit code 1 |
 | Query timeout | `QueryToCsv: query timed out.`, exit code 1 |
 | Non-SELECT statement detected | `QueryToCsv: only SELECT statements are allowed.`, exit code 1 |
@@ -351,3 +373,5 @@ The installer:
 - Creates `queries/` and `output/` folders
 - Optionally adds the install directory to user `PATH`
 - Preserves `appsettings.json` on upgrades (only created on first install)
+- On uninstall, removes the program and keeps `appsettings.json`, `queries/`, `output/`, and `logs/`
+- In an unattended upgrade or uninstall, asks a running QueryToCsv to close and fails without changing anything when it does not

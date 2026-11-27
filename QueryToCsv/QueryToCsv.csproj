@@ -6,6 +6,9 @@
     <RootNamespace>QueryToCsv</RootNamespace>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
+    <!-- LibraryImport generates the marshalling for the Credential Manager calls
+         (CredentialStore.cs) as unsafe code -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

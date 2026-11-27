@@ -6,6 +6,7 @@ namespace QueryToCsv.Tests;
 public class ApplicationVersionTests
 {
     [Fact]
+    [Trait("Requirement", "QTC-3")]
     internal void ProductVersion_ApplicationAssembly_ReturnsInformationalVersionWithoutMetadata()
     {
         string informationalVersion = typeof(ApplicationVersion).Assembly
@@ -18,6 +19,7 @@ public class ApplicationVersionTests
     }
 
     [Fact]
+    [Trait("Requirement", "QTC-3")]
     internal void DisplayText_ApplicationAssembly_ReturnsNameAndProductVersion()
     {
         Assert.Equal(

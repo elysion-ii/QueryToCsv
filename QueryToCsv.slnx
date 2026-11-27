@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="QueryToCsv/QueryToCsv.csproj" />
   <Project Path="QueryToCsv.Tests/QueryToCsv.Tests.csproj" />
+  <Project Path="QueryToCsv.TestSupport/QueryToCsv.TestSupport.csproj" />
+  <Project Path="QueryToCsv.EndToEndTests/QueryToCsv.EndToEndTests.csproj" />
 </Solution>

@@ -18,7 +18,7 @@ internal sealed record CliInvocation(
 
         if (args[0] == "--open")
         {
-            if (args.Length == 1)
+            if (args.Length == 1 || args[1].Length == 0)
                 return (null, "option '--open' requires a value.");
 
             if (args.Length > 2)

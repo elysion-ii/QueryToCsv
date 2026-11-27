@@ -11,6 +11,41 @@ to build an installer for a version that has no heading here.
 
 ### Changed
 
+- **Breaking**: SQL Server authentication takes its user name and password from Windows
+  Credential Manager, named by the new `Connections[].Credential`. A connection string
+  that contains `Password`/`PWD` or `User ID`/`UID` is rejected at startup; store the
+  credential with `cmdkey /generic:<name> /user:<user> /pass` and name it instead.
+- **Breaking**: a connection string that sets `TrustServerCertificate=True` or turns
+  encryption off is rejected at startup. Give the server a trusted certificate, or pin it
+  with `Server Certificate=<path>`.
+- **Breaking**: connection names must be unique (ignoring case), and a connection string
+  that cannot be parsed is reported at startup instead of when it is used.
+- **Breaking**: CSV values use ISO 8601 dates (`yyyy-MM-dd`, `yyyy-MM-ddTHH:mm:ss.fffffff`,
+  and the offset for `datetimeoffset`) instead of the invariant culture's `MM/dd/yyyy`
+  form, which also dropped fractional seconds. `bit` is written as `1`/`0`, binary values
+  as `0x` followed by hexadecimal digits instead of `System.Byte[]`, and `decimal(38)`
+  values beyond .NET's range exactly instead of failing.
+- **Breaking**: text beginning with `=`, `+`, `-`, `@`, a tab, or a carriage return is
+  written with a leading `'`, so spreadsheets do not evaluate it as a formula.
+- **Breaking**: a character the chosen CSV encoding cannot represent, and an invalid byte
+  in a `.sql` file, end the run naming the row and column or the byte offset; nothing is
+  replaced with `?` or U+FFFD any more.
+- **Breaking**: `CsvSettings.Delimiter` rejects `"`, a line break, and a space;
+  `LogRetentionDays` accepts 1 to 3650. An empty option value (`--query ""`, `-f ""`,
+  `--open ""`) is a usage error, and a relative `-f` path that leaves `QueryFolder` is
+  rejected.
+- **Breaking**: the SELECT-only check also rejects `NEXT VALUE FOR` and linked-server
+  names (`server.database.schema.object`).
+- Log entries carry ISO 8601 times with the UTC offset; `--open log` opens the folder
+  logs are actually written to.
+- The CSV is assembled under `%TEMP%\QueryToCsv` and placed in `OutputFolder` only when
+  complete; temporary files left by a killed run are removed after 24 hours. Two runs that
+  finish in the same second both succeed with different names.
+- Ctrl+C cancels the run cleanly: no CSV, `QueryToCsv: cancelled.`, exit code 1.
+- Uninstalling keeps `appsettings.json`, `queries`, `output`, and `logs`, and rewrites
+  `PATH` only to remove QueryToCsv's own entry. An unattended upgrade fails without
+  changing anything when a running QueryToCsv does not close.
+
 - **Breaking**: the SELECT-only check parses the query as T-SQL and accepts only a single
   `SELECT` statement, optionally preceded by `WITH` common table expressions. The keyword
   scan it replaces let other statements through when they followed a `SELECT` without a
@@ -27,6 +62,16 @@ to build an installer for a version that has no heading here.
 - Failures that end a run — an unknown `-e` encoding, a `-c` connection that is not
   configured, a missing `--connection` with several connections, a missing `-f` file, and
   an empty direct entry — are now written to the log as well as to standard error.
+- A value holding a line feed (with `CRLF` line endings) or a carriage return is now
+  quoted; it was written unquoted and split the record for every CSV reader.
+- A very large `LogRetentionDays` no longer ends every run with
+  "unexpected application failure.", and a log folder that cannot be listed no longer
+  ends the run.
+- An output folder that cannot be written, a full disk, an unreadable `.sql` file or
+  `QueryFolder`, and a CLR column type such as `hierarchyid` are reported with what
+  failed instead of "unexpected application failure.".
+- `.sql` files and SQL text have a size limit (4 MiB and 1,048,576 characters), so memory
+  use stays bounded.
 
 ## [3.0.0] - 2026-09-07
 

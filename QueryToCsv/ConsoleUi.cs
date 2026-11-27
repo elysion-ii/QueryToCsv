@@ -1,10 +1,11 @@
+using System.Globalization;
 using System.Text;
 using Microsoft.Data.SqlClient;
 
 namespace QueryToCsv;
 
 // Every prompt returns null when standard input ends (Ctrl+Z), so the caller decides
-// how the run ends and records it (docs/specs/QueryToCsv.md, QueryToCsv-004).
+// how the run ends and records it (docs/specs/QueryToCsv.md, QTC-12).
 internal static class ConsoleUi
 {
     internal const int DirectEntry = -1;
@@ -18,42 +19,39 @@ internal static class ConsoleUi
             Console.Error.WriteLine($"{i + 1}. {fileNames[i]}");
         Console.Error.WriteLine();
 
-        while (true)
+        int? number = AskNumber(0, fileNames.Count);
+        return number switch
         {
-            Console.Error.Write("Enter number: ");
-            string? input = Console.ReadLine();
-            if (input is null)
-                return null;
-
-            if (int.TryParse(input, out int num))
-            {
-                if (num == 0)
-                    return DirectEntry;
-
-                if (num >= 1 && num <= fileNames.Count)
-                    return num - 1;
-            }
-
-            Console.Error.WriteLine($"Please enter a number between 0 and {fileNames.Count}.");
-        }
+            null => null,
+            0 => DirectEntry,
+            _ => number.Value - 1,
+        };
     }
 
     // The typed SQL, or null when nothing but whitespace was entered. End of input ends
-    // the SQL rather than the run.
+    // the SQL rather than the run. Lines past the SQL text limit are read but not kept, so
+    // memory stays bounded and the returned text still exceeds the limit for the caller to
+    // report (docs/specs/QueryToCsv.md, QTC-14).
     internal static string? InputQuery()
     {
         Console.Error.WriteLine("Enter SQL query (end with Ctrl+Z):");
         List<string> lines = [];
+        long kept = 0;
         while (true)
         {
             Console.Error.Write("  > ");
             string? line = Console.ReadLine();
             if (line is null)
                 break;
-            lines.Add(line);
+
+            if (kept <= SqlText.MaxCharacters)
+            {
+                lines.Add(line);
+                kept += line.Length + 2;
+            }
         }
 
-        string sql = string.Join(Environment.NewLine, lines);
+        string sql = string.Join("\r\n", lines);
         return string.IsNullOrWhiteSpace(sql) ? null : sql;
     }
 
@@ -66,9 +64,10 @@ internal static class ConsoleUi
             if (input is null)
                 return null;
 
-            if (input.Equals("y", StringComparison.OrdinalIgnoreCase))
+            string answer = input.Trim();
+            if (answer.Equals("y", StringComparison.OrdinalIgnoreCase))
                 return true;
-            if (input.Equals("n", StringComparison.OrdinalIgnoreCase))
+            if (answer.Equals("n", StringComparison.OrdinalIgnoreCase))
                 return false;
 
             Console.Error.WriteLine("Please enter y or n.");
@@ -84,39 +83,40 @@ internal static class ConsoleUi
         Console.Error.WriteLine("4. Shift-JIS");
         Console.Error.WriteLine();
 
-        while (true)
+        return AskNumber(1, 4) switch
         {
-            Console.Error.Write("Enter number: ");
-            string? input = Console.ReadLine();
-            if (input is null)
-                return null;
-
-            Encoding? encoding = input switch
-            {
-                "1" => ResolveEncoding("utf-8"),
-                "2" => ResolveEncoding("utf-8-bom"),
-                "3" => ResolveEncoding("utf-16"),
-                "4" => ResolveEncoding("shift-jis"),
-                _ => null,
-            };
-
-            if (encoding is not null)
-                return encoding;
-
-            Console.Error.WriteLine("Please enter a number between 1 and 4.");
-        }
+            null => null,
+            1 => ResolveEncoding("utf-8"),
+            2 => ResolveEncoding("utf-8-bom"),
+            3 => ResolveEncoding("utf-16"),
+            _ => ResolveEncoding("shift-jis"),
+        };
     }
 
+    // The CSV encoding for a name, or null for a name not offered. Each encoding throws on
+    // a character it cannot represent instead of writing a replacement
+    // (docs/specs/QueryToCsv.md, QTC-10 and QTC-22).
     internal static Encoding? ResolveEncoding(string name)
     {
         return name.ToLowerInvariant() switch
         {
-            "utf-8" or "utf8" => new UTF8Encoding(false),
-            "utf-8-bom" or "utf8-bom" => new UTF8Encoding(true),
-            "utf-16" or "utf16" => Encoding.Unicode,
-            "shift-jis" or "shiftjis" or "shift_jis" => Encoding.GetEncoding("Shift-JIS"),
+            "utf-8" or "utf8" => Strict(new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)),
+            "utf-8-bom" or "utf8-bom" => Strict(new UTF8Encoding(encoderShouldEmitUTF8Identifier: true)),
+            "utf-16" or "utf16" => Strict(new UnicodeEncoding(bigEndian: false, byteOrderMark: true)),
+            "shift-jis" or "shiftjis" or "shift_jis" => Encoding.GetEncoding(
+                "shift_jis", EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback),
             _ => null,
         };
+    }
+
+    // The encoding with exception fallbacks; the constructors' own switch covers decoding
+    // only, and an unpaired surrogate would still be written as U+FFFD.
+    private static Encoding Strict(Encoding encoding)
+    {
+        Encoding strict = (Encoding)encoding.Clone();
+        strict.EncoderFallback = EncoderFallback.ExceptionFallback;
+        strict.DecoderFallback = DecoderFallback.ExceptionFallback;
+        return strict;
     }
 
     // The index of the chosen connection, or null when input ends.
@@ -133,6 +133,15 @@ internal static class ConsoleUi
         }
         Console.Error.WriteLine();
 
+        int? number = AskNumber(1, connections.Count);
+        return number - 1;
+    }
+
+    // The number typed, within first..last, or null when input ends. Each invalid answer
+    // reads a new line, so asking again ends with the input
+    // (docs/specs/QueryToCsv.md, QTC-12).
+    private static int? AskNumber(int first, int last)
+    {
         while (true)
         {
             Console.Error.Write("Enter number: ");
@@ -140,27 +149,35 @@ internal static class ConsoleUi
             if (input is null)
                 return null;
 
-            if (int.TryParse(input, out int num) && num >= 1 && num <= connections.Count)
-                return num - 1;
+            int? number = ParseChoice(input, first, last);
+            if (number is not null)
+                return number;
 
-            Console.Error.WriteLine($"Please enter a number between 1 and {connections.Count}.");
+            Console.Error.WriteLine($"Please enter a number between {first} and {last}.");
         }
     }
 
-    // A connection string the builder cannot parse still lists the entry, so the user can
-    // pick it and get the connection failure reported when it is used.
+    // ASCII digits only, surrounding whitespace removed: a sign, a group separator, or a
+    // culture's own digits is not an answer to a numbered list.
+    internal static int? ParseChoice(string input, int first, int last)
+    {
+        string answer = input.Trim();
+        if (answer.Length == 0 || !answer.All(char.IsAsciiDigit))
+            return null;
+
+        return int.TryParse(answer, NumberStyles.None, CultureInfo.InvariantCulture, out int number)
+               && number >= first && number <= last
+            ? number
+            : null;
+    }
+
+    // Configuration validation has already parsed every connection string (QTC-7); a part
+    // it does not state shows as "?".
     private static string FormatConnectionInfo(string connectionString)
     {
-        try
-        {
-            SqlConnectionStringBuilder builder = new(connectionString);
-            string server = string.IsNullOrEmpty(builder.DataSource) ? "?" : builder.DataSource;
-            string database = string.IsNullOrEmpty(builder.InitialCatalog) ? "?" : builder.InitialCatalog;
-            return $"{server} - {database}";
-        }
-        catch (Exception)
-        {
-            return "?";
-        }
+        SqlConnectionStringBuilder builder = new(connectionString);
+        string server = string.IsNullOrEmpty(builder.DataSource) ? "?" : builder.DataSource;
+        string database = string.IsNullOrEmpty(builder.InitialCatalog) ? "?" : builder.InitialCatalog;
+        return $"{server} - {database}";
     }
 }

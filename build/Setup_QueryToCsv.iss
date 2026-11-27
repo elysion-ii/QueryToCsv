@@ -42,13 +42,15 @@ Name: "addtopath"; Description: "Add to PATH environment variable"; GroupDescrip
 ; excluded because running the app from the build output fills them with local data;
 ; [Dirs] below creates them empty at the install target.
 Source: "QueryToCsv\*"; Excludes: "appsettings.json,logs\*,queries\*,output\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; appsettings is user config, only copy on first install to preserve user settings
-Source: "QueryToCsv\appsettings.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
+; appsettings.json is the operator's configuration: written only when none exists, so an
+; upgrade keeps it, and never removed, so an uninstall keeps it too
+; (docs/specs/QueryToCsv.md, QTC-27).
+Source: "QueryToCsv\appsettings.json"; DestDir: "{app}"; Flags: onlyifdoesntexist uninsneveruninstall
 
 [Dirs]
-; create queries and output folders
-Name: "{app}\queries"
-Name: "{app}\output"
+; The operator's queries and exports stay when QueryToCsv is uninstalled.
+Name: "{app}\queries"; Flags: uninsneveruninstall
+Name: "{app}\output"; Flags: uninsneveruninstall
 
 [CustomMessages]
 AppRunningCaption={#MyAppName} is still running
@@ -86,24 +88,24 @@ const
 // build a multi-element native pointer array, and does not need to.
 function RmStartSession(var pSessionHandle: Cardinal; dwSessionFlags: Cardinal;
   strSessionKey: Cardinal): Cardinal;
-  external 'RmStartSession@rstrtmgr.dll stdcall uninstallonly';
+  external 'RmStartSession@rstrtmgr.dll stdcall';
 
 function RmRegisterResources(dwSessionHandle: Cardinal; nFiles: Cardinal;
   var rgsFilenames: Cardinal; nApplications: Cardinal; rgApplications: Cardinal;
   nServices: Cardinal; rgsServiceNames: Cardinal): Cardinal;
-  external 'RmRegisterResources@rstrtmgr.dll stdcall uninstallonly';
+  external 'RmRegisterResources@rstrtmgr.dll stdcall';
 
 function RmGetList(dwSessionHandle: Cardinal; var pnProcInfoNeeded: Cardinal;
   var pnProcInfo: Cardinal; rgAffectedApps: Cardinal;
   var lpdwRebootReasons: Cardinal): Cardinal;
-  external 'RmGetList@rstrtmgr.dll stdcall uninstallonly';
+  external 'RmGetList@rstrtmgr.dll stdcall';
 
 function RmShutdown(dwSessionHandle: Cardinal; lActionFlags: Cardinal;
   fnStatus: Cardinal): Cardinal;
-  external 'RmShutdown@rstrtmgr.dll stdcall uninstallonly';
+  external 'RmShutdown@rstrtmgr.dll stdcall';
 
 function RmEndSession(dwSessionHandle: Cardinal): Cardinal;
-  external 'RmEndSession@rstrtmgr.dll stdcall uninstallonly';
+  external 'RmEndSession@rstrtmgr.dll stdcall';
 
 var
   // The registered addresses point into this array, so it outlives every session.
@@ -273,23 +275,54 @@ begin
   until False;
 end;
 
+// An unattended upgrade cannot ask the user, so it asks the running processes to close
+// and refuses to replace anything when they stay open: Setup then ends with a non-zero
+// exit code and the installed files stay as they were. Nothing is closed forcibly
+// (docs/specs/QueryToCsv.md, QTC-28). An attended upgrade is left to CloseApplications.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  if not WizardSilent then
+    Exit;
+
+  SetArrayLength(AppExecutables, 0);
+  CollectAppExecutables(ExpandConstant('{app}'), '');
+  if GetArrayLength(AppExecutables) = 0 then
+    Exit;
+
+  // As for uninstall, a detector that cannot answer does not block the upgrade.
+  if CountRunningProcesses <= 0 then
+    Exit;
+
+  if not CloseRunningProcesses then
+    Result := '{#MyAppName} is still running and did not close; nothing was changed.';
+end;
+
 // Rewrite the user PATH: remove every entry equal to TargetPath (case-insensitive),
-// then optionally append a single fresh entry at the end.
+// then optionally append a single fresh entry at the end. Every other entry, empty ones
+// included, is kept as written, and a PATH with nothing to change is not rewritten
+// (docs/specs/QueryToCsv.md, QTC-27).
 procedure UpdateUserPath(TargetPath: string; AddEntry: Boolean);
 var
   OrigPath: string;
+  HasPath: Boolean;
   TargetUpper: string;
   Remaining: string;
   Entry: string;
   Rebuilt: string;
+  First: Boolean;
+  Removed: Boolean;
   SemiPos: Integer;
 begin
-  if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', OrigPath) then
+  HasPath := RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', OrigPath);
+  if not HasPath then
     OrigPath := '';
 
   TargetUpper := Uppercase(TargetPath);
   Remaining := OrigPath;
   Rebuilt := '';
+  First := True;
+  Removed := False;
 
   while Length(Remaining) > 0 do begin
     SemiPos := Pos(';', Remaining);
@@ -301,20 +334,30 @@ begin
       Remaining := '';
     end;
 
-    if (Entry <> '') and (Uppercase(Entry) <> TargetUpper) then begin
-      if Rebuilt <> '' then
+    if Uppercase(Entry) = TargetUpper then
+      Removed := True
+    else begin
+      if not First then
         Rebuilt := Rebuilt + ';';
       Rebuilt := Rebuilt + Entry;
+      First := False;
     end;
   end;
 
   if AddEntry then begin
-    if Rebuilt <> '' then
+    if (Rebuilt <> '') and (Copy(Rebuilt, Length(Rebuilt), 1) <> ';') then
       Rebuilt := Rebuilt + ';';
     Rebuilt := Rebuilt + TargetPath;
-  end;
+  end
+  else if not Removed then
+    Exit;
 
-  RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Rebuilt);
+  // RegWriteStringValue keeps an existing value's REG_EXPAND_SZ type; a new value takes
+  // the type Windows gives the user PATH.
+  if HasPath then
+    RegWriteStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Rebuilt)
+  else
+    RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Rebuilt);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

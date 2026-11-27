@@ -108,21 +108,20 @@ internal sealed record CliRunArgs(
         out string value,
         out string? error)
     {
-        if (attachedValue is not null)
-        {
-            value = attachedValue;
-            error = null;
-            return true;
-        }
+        string? candidate = attachedValue;
+        if (candidate is null && index + 1 < args.Length)
+            candidate = args[++index];
 
-        if (index + 1 >= args.Length)
+        // An empty value names nothing, so it is the same usage error as an omitted one
+        // (docs/specs/QueryToCsv.md, QTC-9).
+        if (string.IsNullOrEmpty(candidate))
         {
             value = "";
             error = $"option '{option}' requires a value.";
             return false;
         }
 
-        value = args[++index];
+        value = candidate;
         error = null;
         return true;
     }

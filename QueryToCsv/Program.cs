@@ -33,9 +33,18 @@ switch (invocation!.Mode)
 Logger logger = LogSetup.Configure();
 logger.Info($"Application started (v{ApplicationVersion.ProductVersion})");
 
+// Ctrl+C cancels the run cooperatively instead of killing the process, so temporary
+// files are deleted and the end of the run is logged (docs/specs/QueryToCsv.md, QTC-25).
+using CancellationTokenSource cancellation = new();
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    cancellation.Cancel();
+};
+
 try
 {
-    int exitCode = await QueryRun.RunAsync(invocation.RunArgs, logger);
+    int exitCode = await QueryRun.RunAsync(invocation.RunArgs, logger, cancellation.Token);
 
     if (exitCode == 0)
         logger.Info("Application finished (exit code: 0)");
@@ -43,6 +52,13 @@ try
         logger.Error($"Application finished (exit code: {exitCode})");
 
     return exitCode;
+}
+catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+{
+    ConsoleMessages.Write("cancelled.");
+    logger.Error("Cancelled by Ctrl+C");
+    logger.Error("Application finished (exit code: 1)");
+    return 1;
 }
 catch (Exception ex)
 {
@@ -85,7 +101,7 @@ static int PrintHelp()
     Console.WriteLine("  queries       Open the queries folder in Explorer");
     Console.WriteLine("  output        Open the output folder in Explorer");
     Console.WriteLine("  config        Open appsettings.json in default editor");
-    Console.WriteLine("  log           Open the logs folder in Explorer");
+    Console.WriteLine("  log           Open the folder log files are written to");
     Console.WriteLine("  <file path>   Open a specific file with its default app");
     Console.WriteLine();
     Console.WriteLine("Examples:");
@@ -93,7 +109,7 @@ static int PrintHelp()
     Console.WriteLine("  QueryToCsv --file monthly-sales.sql --encoding utf-8-bom");
     Console.WriteLine();
     Console.WriteLine("Cancelling:");
-    Console.WriteLine("  Ctrl+C        Exit at any time");
+    Console.WriteLine("  Ctrl+C        Cancel the run; nothing is written");
     Console.WriteLine("  Ctrl+Z+Enter  Exit at any input prompt");
     return 0;
 }
@@ -101,6 +117,8 @@ static int PrintHelp()
 static int HandleOpen(string target)
 {
     string baseDir = AppContext.BaseDirectory;
+
+    // Windows file names ignore case, so the keywords do too (docs/specs/QueryToCsv.md, QTC-4).
     string normalizedTarget = target.ToLowerInvariant();
 
     string path;
@@ -124,9 +142,18 @@ static int HandleOpen(string target)
             isFile = true;
             break;
         case "log":
-            path = Path.Combine(baseDir, LogSetup.FolderName);
-            isFile = false;
-            break;
+            {
+                string? logDirectory = LogSetup.WritableDirectory;
+                if (logDirectory is null)
+                {
+                    ConsoleMessages.Write("logging is unavailable on this machine.");
+                    return 1;
+                }
+
+                path = logDirectory;
+                isFile = false;
+                break;
+            }
         default:
             path = Path.IsPathRooted(target)
                 ? target
