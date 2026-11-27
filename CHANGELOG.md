@@ -9,6 +9,15 @@ to build an installer for a version that has no heading here.
 
 ## [Unreleased]
 
+### Added
+
+- `QueryToCsv --guide` prints the usage guide to standard output: configuration,
+  connections, SQL files, run modes, the CSV format, logs, and errors. The guide is built
+  into the executable, so it is available wherever QueryToCsv is installed, the standalone
+  executable included; `QueryToCsv --guide > usage.md` saves it. The same text is
+  `docs/guides/usage.md` in the repository, and the README now gives a short overview
+  that links to it.
+
 ### Changed
 
 - A connection string that sets `TrustServerCertificate=True` is accepted again instead

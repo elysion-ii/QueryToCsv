@@ -1,3 +1,4 @@
+using QueryToCsv.TestSupport;
 using Xunit;
 
 namespace QueryToCsv.EndToEndTests;
@@ -33,7 +34,7 @@ public sealed class CommandLineTests : IDisposable
         Assert.Equal(0, result.ExitCode);
         Assert.Equal("", result.Error);
         string[] sections = ["QueryToCsv ", "Export a SQL Server result set to CSV.", "Usage:", "Options:", "--connection", "--query",
-            "--file", "--encoding", "--no-header", "Open targets:", "Examples:", "Cancelling:", "Ctrl+C"];
+            "--file", "--encoding", "--no-header", "--guide", "Open targets:", "Examples:", "Cancelling:", "Ctrl+C"];
         int position = 0;
         foreach (string section in sections)
         {
@@ -41,6 +42,26 @@ public sealed class CommandLineTests : IDisposable
             Assert.True(found >= 0, $"Help is missing \"{section}\" after position {position}.");
             position = found;
         }
+    }
+
+    [Fact]
+    [Trait("Requirement", "QTC-1")]
+    [Trait("Requirement", "QTC-29")]
+    internal async Task Guide_PrintsTheRepositoryGuideAndExitsWithoutConfiguration()
+    {
+        // Without front matter, with CRLF line endings: the guide as the specification
+        // states it, derived here independently of the application's own rendering.
+        string document = File.ReadAllText(Path.Combine(Repository.Root, "docs", "guides", "usage.md")).ReplaceLineEndings("\n");
+        string[] parts = document.Split("---\n", 3);
+        string expected = parts[2].TrimStart('\n').Replace("\n", "\r\n", StringComparison.Ordinal);
+
+        AppResult result = await _app.RunAsync(["--guide", "ignored"]);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(expected, result.Output);
+        Assert.StartsWith("# QueryToCsv Usage Guide\r\n", result.Output, StringComparison.Ordinal);
+        Assert.Equal("", result.Error);
+        Assert.False(Directory.Exists(_app.LogFolder));
     }
 
     [Fact]

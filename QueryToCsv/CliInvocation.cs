@@ -16,6 +16,9 @@ internal sealed record CliInvocation(
         if (args[0] is "-V" or "--version")
             return (new CliInvocation(CliMode.Version, null, null), null);
 
+        if (args[0] == "--guide")
+            return (new CliInvocation(CliMode.Guide, null, null), null);
+
         if (args[0] == "--open")
         {
             if (args.Length == 1 || args[1].Length == 0)

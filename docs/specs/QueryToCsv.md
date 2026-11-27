@@ -25,8 +25,8 @@ whose format is fixed by this document and the configuration.
 ## Scope
 
 The behavior of the `QueryToCsv` executable — its run modes (interactive and one-liner),
-its auxiliary modes (help, version, open), configuration, CSV output, logging, and error
-reporting — and of its installer.
+its auxiliary modes (help, version, guide, open), configuration, CSV output, logging, and
+error reporting — and of its installer.
 
 Projects: `QueryToCsv` (the application), `QueryToCsv.Tests` (unit and boundary tests),
 `QueryToCsv.EndToEndTests` (end-to-end tests of the built executable), `QueryToCsv.TestSupport`
@@ -55,24 +55,41 @@ Projects: `QueryToCsv` (the application), `QueryToCsv.Tests` (unit and boundary 
 | none | Interactive (QTC-12) |
 | first argument `-h` or `--help` | Help (QTC-2) |
 | first argument `-V` or `--version` | Version (QTC-3) |
+| first argument `--guide` | Guide (QTC-29) |
 | first argument `--open` or `--open=<target>` | Open (QTC-4) |
 | anything else | One-liner (QTC-9) |
 
-Only the first argument is examined for help, version, and open; arguments after `-h`,
-`--help`, `-V`, or `--version` are ignored. `--open` in any other position is an unknown
-one-liner option (QTC-9). Help, version, and open neither validate the connections nor
-write log entries, because they do no export.
+Only the first argument is examined for help, version, guide, and open; arguments after
+`-h`, `--help`, `-V`, `--version`, or `--guide` are ignored. `--guide` and `--open` in any
+other position are unknown one-liner options (QTC-9). Help, version, guide, and open
+neither validate the connections nor write log entries, because they do no export.
 
 ### QTC-2: Help
 
 Help prints to standard output, in this order: the version line, a one-line summary, the
-usage forms, every option with its short and long form, the open targets, representative
-examples, and how to cancel (QTC-25). It exits 0 without reading configuration.
+usage forms, every option with its short and long form (`--guide` among them, QTC-29),
+the open targets, representative examples, and how to cancel (QTC-25). It exits 0
+without reading configuration.
 
 ### QTC-3: Version
 
 Version prints `QueryToCsv X.Y.Z` to standard output — the version the build defines,
 with no build metadata — and exits 0 without reading configuration.
+
+### QTC-29: Guide
+
+`--guide` prints the usage guide to standard output and exits 0 without reading
+configuration. Help lists only the options in brief; the guide holds what an operator
+needs beyond them — configuration, connections, SQL files, run modes, CSV output, logs,
+and errors — and travels inside the executable, because an installation, and the
+standalone executable above all, carries no other documentation.
+
+- The guide is the text of `docs/guides/usage.md` from the same source as the executable,
+  without its front matter, so the document in the repository and the text the
+  executable prints are one and the same.
+- It is Markdown made only of ASCII characters, so it reads the same in every console
+  code page and in a file it is redirected to (`QueryToCsv --guide > usage.md`).
+- Its lines end with CRLF, like every other line QueryToCsv writes.
 
 ### QTC-4: Open mode
 
