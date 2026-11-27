@@ -34,7 +34,7 @@ no default, and which default substitutions are reported.
 ## Application Rules
 
 - **Only SELECT statements may reach the server.** `QueryExecutor.IsSelectOnly` parses
-  the text as T-SQL and accepts only what QueryToCsv-007 in `docs/specs/QueryToCsv.md`
+  the text as T-SQL and accepts only what QTC-15 in `docs/specs/QueryToCsv.md`
   states. The decision is made on the parse tree, never on keywords found in the text,
   because T-SQL places one statement after another without any separator: a keyword list
   cannot see where the `SELECT` ends and the next statement begins. A change that widens
