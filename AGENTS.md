@@ -17,7 +17,7 @@ Rule bodies live under `docs/rules/`. Edit this file, never `CLAUDE.md`.
 | Database | Microsoft SQL Server via `Microsoft.Data.SqlClient` |
 | CSV | CsvHelper (RFC 4180) |
 | Logging | NLog, one file per day under `logs/` next to the executable, falling back to the user's local application data when that folder cannot be written to |
-| Distribution | Self-contained publish + Inno Setup installer; the published file set follows from the native dependencies (`docs/rules/dotnet.md` NATIVEDEP) |
+| Distribution | Self-contained publish + Inno Setup installer; the published file set follows from the native dependencies (`docs/rules/dotnet-client.md` NATIVEDEP) |
 
 ## Applications
 
@@ -27,10 +27,11 @@ Rule bodies live under `docs/rules/`. Edit this file, never `CLAUDE.md`.
 
 ## Rules and AUDIT
 
-`docs/rules/` holds the core — `standard.md`, `documentation.md`, `git.md`, `cli.md`,
-`dotnet.md` — and `QueryToCsv.md`, which carries this repository's own rules and its
-overrides of the core. `QueryToCsv.md` wins on conflict; within the core `dotnet.md`
-wins over `standard.md`.
+`docs/rules/` holds the universal shared rules (`standard.md`, `documentation.md`,
+`specs.md`, `testing.md`), the .NET stack rules (`dotnet.md`), the other rule files
+dev-standards distributes for this application, and `QueryToCsv.md`, which carries this
+repository's own rules and its overrides. Precedence on conflict is stated in
+`docs/rules/standard.md` (How to Use These Rules).
 
 **Before implementing any change, read all of them, and `docs/specs/QueryToCsv.md` with
 them.** QueryToCsv is a console application, so `cli.md` binds too — nothing here is
@@ -39,7 +40,7 @@ how a rule goes unapplied.
 
 - **When transitioning from a plan to implementation**, re-read this file (root and any nested `AGENTS.md` covering the work area) and the rules files first, so all rules are loaded before code is written
 - **Before reporting an implementation task as complete**, run the AUDIT procedure at the end of `docs/rules/standard.md`
-- `docs/rules/standard.md`, `docs/rules/documentation.md`, `docs/rules/git.md`, `docs/rules/cli.md`, and `docs/rules/dotnet.md` are managed by dev-standards — never edit them; repository- and application-specific rules go in `docs/rules/QueryToCsv.md`
+- Every file under `docs/rules/` except `QueryToCsv.md` is managed by dev-standards — never edit them; repository- and application-specific rules go in `docs/rules/QueryToCsv.md`
 
 ## Commands
 
@@ -95,7 +96,7 @@ Before creating, changing, moving, renaming, archiving, or deleting any document
 when unsure where one belongs — read `docs/rules/documentation.md` (also distributed
 in this repository) first; it defines placement, naming, and front matter.
 
-- `docs/rules/` — rule bodies: `standard.md`, `documentation.md`, `git.md`, `cli.md` + `dotnet.md` (managed by dev-standards) and `QueryToCsv.md` (application rules)
+- `docs/rules/` — rule bodies: the files managed by dev-standards, and `QueryToCsv.md` (application rules)
 - `docs/specs/QueryToCsv.md` — the QueryToCsv specification: what it does
 - `docs/guides/` — repository-specific procedures, including `release.md`
 - `docs/adr/` — Architecture Decision Records; retired ADRs move to `docs/adr/archive/`

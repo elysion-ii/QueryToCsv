@@ -16,7 +16,7 @@ All async methods that perform potentially long I/O (DB, file, network, external
 
 The token parameter is cheap to carry (a defaulted parameter, one argument per await), while retrofitting it later costs a cross-layer signature change per helper. Plumbing it up front means connecting a real cancellation source becomes an entry-point-only change: a GUI adds a cancel button backed by a `CancellationTokenSource`; a console app hooks `Console.CancelKeyPress` (or uses the Generic Host stopping token) so Ctrl+C becomes graceful cooperative cancellation instead of an abrupt process kill. Either way, the token just flows into calls that are already tokened.
 
-Operations that must run to completion are deliberately excluded and must NOT take a token: logging, transaction rollback, best-effort cleanup, and post-commit finalization. Cancelling these would lose diagnostic records, mask original exceptions, or leave files inconsistent with committed data. The exact list lives in `docs/rules/dotnet.md`, CANCEL.
+Operations that must run to completion are deliberately excluded and must NOT take a token: logging, transaction rollback, best-effort cleanup, and post-commit finalization. Cancelling these would lose diagnostic records, mask original exceptions, or leave files inconsistent with committed data. The exact list lives in `docs/rules/standard.md`, Synchronous vs Asynchronous.
 
 ## Alternatives Considered
 

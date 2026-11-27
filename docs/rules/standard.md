@@ -1,29 +1,23 @@
-# Shared Engineering Standards (core)
+# Shared Engineering Standards (Core)
 
-Shared engineering standards, distributed into each repository at `docs/rules/`. This
-file is the language-agnostic core. Language-specific rules live in sibling files in the
-same directory (`dotnet.md`, ...); application-specific rules live in the application's
-rules file listed in the repository's `AGENTS.md` Applications table.
+Stack-agnostic engineering ideals applied to every application. Distributed under
+`docs/rules/` alongside any stack rule files and conditional rule files that apply to
+the repository, and the repository's own application rules.
 
-## How to use these rules
+## How to Use These Rules
 
-Read every rule file in this directory before implementing any change, together with
-the rules file and specification of the application being changed — the `AGENTS.md`
-Applications table names both. `cli.md` is the only file that may be skipped, and only
-while that application exposes no command-line interface (neither a console application
-nor a GUI application that accepts command-line options). Judging any other file
-unrelated to the work at hand and leaving it unread is how a rule goes unapplied.
+Rules in `docs/rules/` form three tiers:
 
-- A repository reads the language files matching its technology stack — a .NET
-  repository reads `dotnet.md`, a multi-stack repository reads every matching file. Its
-  `AGENTS.md` states the stack and the concrete commands (formatter, build, test).
-- Each language file begins with an **enforcement matrix** stating which rules the
-  project scaffold enforces mechanically (analyzers, build gates) and which must be
-  checked by AUDIT.
-- Precedence on conflict: the more specific file wins — application rules > language
-  rules and `cli.md` > this file. `AGENTS.md` holds no rule text; it only routes.
-- Before reporting an implementation task as complete, run **AUDIT** (bottom of this
-  file).
+- **Application rules**: repository- and application-specific rules and overrides, written in the repository's own files under `docs/rules/` and routed to from `AGENTS.md`
+- **Stack rules**: technology-stack means and constraints distributed for the repository's stack
+- **Shared rules**: universal rules (`standard.md`, `documentation.md`, `specs.md`, `testing.md`), plus any conditional shared rule files distributed to the repository
+
+- **Precedence on conflict**: Application rules > Stack rules > Shared rules.
+- **No conflicts among shared rules**: a contradiction between two stack-agnostic rule files under `docs/rules/` is a defect in the rules. Report it to the user and continue only on the user's decision — never by silently picking one side.
+- **Rule scope**: every change complies with all four universal rule files under `docs/rules/` (`standard.md`, `documentation.md`, `specs.md`, `testing.md`), with every conditional or stack rule file present under `docs/rules/` whose `Applies when` condition (if any) holds for the application being changed after the change — evaluated as a fact settled by the application's code, never whether the current task touches that subject (ignoring files whose condition is false for that application, such as in multi-application repositories) — and with the specification under `docs/specs/` of every touched application.
+- **Missing conditional rules**: conditional shared rule files cover ten stack-agnostic domains, each named here by the opening of its `Applies when` condition — `cli.md` (exposes a command-line interface to users or scripts), `client.md` (is packaged, distributed to, and run directly on user or operator machines), `cloud.md` (stores objects or files in cloud storage, integrates with cloud-provider managed services, or maintains cloud-hosted backups), `configuration.md` (reads persistent or environment-supplied settings), `db.md` (reads or writes a database), `file-exchange.md` (reads or writes files exchanged with people or other programs), `remote-calls.md` (invokes external systems over a network), `security.md` (handles secrets or personal data, or restricts data or actions per authenticated user or role), `values.md` (persists domain values or exchanges them across system, file, or format boundaries), and `web-api.md` (exposes an HTTP or Web API). When a change introduces or expands behavior into any domain above whose rule file is absent from `docs/rules/`, report the missing file(s) to the user before or alongside implementation so they can be added to `docs/rules/` (never invent obligations from memory for an absent file; `Rule scope` binds the change only to files present under `docs/rules/`).
+- **Required reading**: read every applicable file under `docs/rules/` before implementing any change.
+- **Completion requirement**: no implementation task (any change that adds, modifies, or deletes source code, tests, build configuration, specifications, or documentation) is reported complete until the AUDIT gate at the end of this file passes.
 
 ---
 
@@ -31,328 +25,222 @@ unrelated to the work at hand and leaving it unread is how a rule goes unapplied
 
 ### Separation of Concerns
 
-- Structure code in layers with distinct responsibilities (e.g., UI → business logic → infrastructure)
-- Keep the UI layer thin: event handlers delegate to logic, they do not contain it
+- **Split by feature first**: keep the code that changes together for one feature (its screens, screen logic, decisions, and data access) together, apart from other features (`Code Organization`).
+- **Separate decisions from I/O inside a feature**: within a feature, decision code stays apart from presentation and external I/O (`Functional Core, Imperative Shell`), so each part changes for one reason only.
+- **Delegate from UI handlers**: where a UI exists, UI event handlers forward input and invoke logic without embedding business decisions.
+- **Keep presentation decisions testable**: where a UI exists, compute choices among visible alternatives (e.g., color, enabled or visible state, status message) derived from data or operation outcomes in code a test can invoke without rendering a screen; fixed display constants require no decision code.
 
 ### Dependency Direction
 
-- Dependencies must flow in one direction only (e.g., UI → Service → Common → Database)
-- Never introduce reverse or circular dependencies. If a change would require one, reconsider the design before implementing
+- **One-way dependencies**: dependencies flow in one direction only and never form a cycle (e.g., screen code calls decision code; decision code depends on no I/O code). Redesign any change that would introduce a reverse or circular dependency before implementing it.
+- **No required inversion**: inverting dependencies so that decision code defines interfaces for I/O code to implement is not required; it is used only where a current requirement needs the substitution (`Build for Current Requirements`).
+
+### Build for Current Requirements
+
+- **No provisions for unrequested change**: never add provisions for substitutions or extensions no current requirement needs (e.g., an interface with a single implementation, an unused extension point, a generalization with a single caller). An interface whose only second implementation is a test substitute is allowed (`No Lasagna Code`). `Minimal Visibility`, `One Home per Piece of Knowledge` (promote when the second consumer appears), and `No Lasagna Code` apply this rule to their own subjects. A provision another rule requires (e.g., a cancellation parameter on every asynchronous I/O operation, `Synchronous vs Asynchronous`) is a current requirement, not a speculative one.
+
+### Minimal Visibility
+
+A declaration visible wider than its callers claims callers that do not exist and invites new code to depend on it.
+
+- **Narrowest enclosing scope**: declare every type, module, and member at the narrowest visibility that covers all existing callers; widen visibility only when a caller that requires it is written.
+- **Match enclosing reach**: a member is never declared more visible than its enclosing type or module allows, except where an external caller or framework requires that wider declaration.
+- **Frameworks count as callers without widening defaults**: frameworks that invoke or bind code by runtime rules (e.g., serializers, dependency-injection containers, UI binders, code generators) count as callers for the visibility they require, but never configure a framework to bypass its default visibility rules and expose non-public members broadly.
+- **Tests never widen visibility**: tests reach internal code solely through the stack's test-access mechanism or through public entry points — never by widening production declarations for test access.
+- Stack rules define the language's modifiers, framework requirements, and test-access mechanisms.
 
 ### Functional Core, Imperative Shell
 
-- Separate decisions from I/O: do not make business decisions while reading from DB/files/network — read the data first, then decide on the data already read
-- Decision logic takes data as arguments and returns results (pure functions), so it can be tested without infrastructure
-- Keep I/O in a thin shell that orchestrates: fetch → decide (pure) → write
-- Time, randomness, and environment values are inputs too: pass them as arguments; introduce clock abstractions or DI only when argument-passing is not enough
+- **Separate decisions from I/O**: fetch data in an outer I/O shell, execute pure decisions on that in-memory data, and write results back in the shell — never interleave decisions with live reads or writes across databases, files, or networks.
+- **Pure decision functions**: decision logic accepts data as arguments and returns results without external side effects, allowing tests to run without infrastructure.
+- **Side effects stay in the shell**: decision logic may emit diagnostic log entries (which alter no domain state or result); every persistent or external write remains in the imperative shell.
+- **Pass ambient values as inputs**: pass current time, randomness, and environment values (e.g., locale or host settings) as arguments; introduce a clock or provider abstraction only when a single argument cannot represent changing values (e.g., measuring elapsed duration) or a framework mandates a fixed signature.
+
+### Declared Mutation
+
+A call changes only what its name and signature declare, and state mutates only where mutation is required.
+
+- **No hidden argument mutation**: modify an argument passed to a function only when the function's name declares that mutation (e.g., sorting or filling in place) or the language signature marks the parameter as mutable; return new values otherwise.
+- **Immutable by default**: mark variables, fields, and objects unassignable or immutable wherever the language supports it, unless subsequent mutation is required.
+- **Framework-constructed objects**: leave state mutable only where a framework sets properties solely after construction; where a framework can populate immutable members during construction, configure it to do so.
 
 ### Declarative Where It Removes Machinery
 
-Neither form is better by default. A query pipeline is not safer than a loop, and a loop
-is not clearer than a pipeline. What decides it is how much the reader has to hold in
-their head, and that is visible.
+Inside a function, prefer whichever form leaves less control-flow machinery to trace while preserving readability.
 
-- Write the transformation declaratively when doing so **removes** machinery that carries no meaning: a mutable accumulator, an index, a nesting level, an append call. What remains is the transformation the reader came for — filter, map, group, sort
-- Keep the loop when the declarative form **adds** machinery to force the logic into a shape it does not have: a tuple accumulator standing in for mutable state, extra traversals to produce what one traversal already produced, a fold whose body is the loop body with its state spelled out
-- The test is not "which is simpler". Simplicity is a judgement about the reader, and the writer is a poor judge of it. The test is whether the rewrite subtracted mechanism or added it, which anyone can check
-- Control flow is machinery a declarative form usually adds rather than removes: early exit with a reason, per-item error handling, cancellation checks, state that depends on the previous element. These stay imperative
-- Performance justifies keeping the form that reads worse **only with a measurement behind it**. Without one, write the form that removes machinery: an unmeasured belief about speed is not a reason to make code harder to read
-- This rule governs the inside of a function. Which side of the boundary code sits on — pure decision or effectful shell — is Functional Core, Imperative Shell above, and it wins where the two meet: the shell is a sequence of steps and stays one
+- **Declarative pipelines**: use filter, map, group, sort, and aggregate pipelines when they eliminate mutable accumulators, manual index tracking, nested loops, or manual list building.
+- **Imperative loops**: use explicit loops when a pipeline would require state-mimicking tuple accumulators, redundant passes, or complex control flow (e.g., early exits with reasons, per-item error recovery, cancellation checks, dependencies between adjacent items).
+- **Measure before complicating**: justify a harder-to-read optimization solely with profiler measurements, never with an assumption.
 
 ### Snapshot Before Mutate
 
-- Never modify a data source while lazily iterating over it. This applies to any deferred/streaming enumeration in any language: directory listings (e.g., C# `Directory.EnumerateFiles`, Python `os.scandir`, POSIX `readdir`), collections under `foreach`, DB cursors, lazy queries (LINQ, generators)
-- Some environments throw immediately; others fail silently — entries get skipped, processed twice, or the loop ends early. Absence of an exception does not mean absence of the bug
-- Snapshot first, then mutate: materialize the full item list (e.g., `.ToList()`, `Directory.GetFiles`, `list(...)`, fetch-all) before the loop that modifies the source
-- This is the same principle as Functional Core, Imperative Shell applied to iteration: read everything first, then act on the data already read
+- **Materialize before mutating**: never modify a data source (e.g., a directory listing, collection, database cursor, or lazy iterator) while lazily iterating over it, because concurrent modification skips entries, repeats items, or fails. Collect the items to change first — the whole list, or one bounded chunk at a time where the whole list is too large to hold in memory — then apply changes to that snapshot before reading further.
 
 ### No Lasagna Code
 
-A layer that adds no behavior still has to be read, navigated, and kept in step with the
-one it forwards to. Layers earn their place by doing something.
+Every layer must justify its existence by adding distinct behavior, transformation, or substitution.
 
-- Do not create pass-through delegation methods that just call another service with the same arguments
-- When extracting shared logic into a new service, update **all** callers to use the new service directly
-- Do not leave wrapper methods on the original class
+- **No pass-through wrappers**: eliminate methods or types whose callers receive the identical result by calling the wrapped target with the identical arguments; cross-cutting concerns such as logging or metrics belong in the layer doing the work or a shared cross-cutting mechanism.
+- **Adapters add substitution**: an interface implementation whose sole purpose is substituting an external dependency during testing is a valid boundary adapter, not a pass-through wrapper.
+- **Call extracted logic directly**: when extracting logic into a new component, update every caller to invoke it directly and remove any leftover forwarding wrapper.
+
+### One Home per Piece of Knowledge
+
+Duplicating a business rule, calculation, or mechanism causes one copy to drift stale when changes arrive; conversely, merging code that only looks alike couples independent reasons for change.
+
+- **Search before writing**: before adding a function, type, or constant, look up the code map (`documentation.md` Code Map) for the feature folder or mechanism home that holds the same knowledge, and reuse or adapt that code (within Shared Algorithm, Local Data) instead of duplicating it.
+- **Keep the code map current**: a change that adds, moves, or removes a feature folder or the home of a mechanism shared across features (e.g., database connection, logging, configuration loading, test infrastructure such as test-store setup) updates the code map in the same change.
+- **One home per mechanism**: how the application performs an operational concern (e.g., building a connection, resolving application directories, writing logs, reaching an external system) lives in one place regardless of caller count; callers obtain the result there and pass caller-specific parameters (e.g., a longer timeout for migrations) rather than assembling a second copy.
+- **Share domain knowledge inside its boundary**: keep single-domain knowledge within that domain until a second domain actually needs it; promote across domains only when the second consumer appears.
+- **Group by reason to change, not surface similarity**: merge two fragments only when a single external authority (e.g., a law, contract, or single decision owner) would change both together; keep distinct policies separate even when their formulas happen to match today.
+- **Library calls alone are not duplicated knowledge**: calling a standard platform API directly (e.g., reading a built-in property or creating an isolated test fixture) is shared shape rather than duplicated application knowledge.
 
 ### Shared Algorithm, Local Data
 
-- When deduplicating similar code, extract only the algorithm (the steps identical everywhere); keep each call site's data (queries, mappings, registrations) local
-- If sharing would require flags or parameters that grow with each new caller, stop sharing
+- **Extract invariant steps only**: share only the algorithmic skeleton common across callers, letting each call site supply its own data, queries, mappings, or rules.
+- **Stop sharing when flags proliferate**: do not unify code if unification requires mode flags or special-case parameters that grow with each new caller.
 
 ### Change as Addition
 
-Adding the tenth variation should cost what the second one cost. It stops costing that as
-soon as a variation means editing branches spread across existing code.
+- **Single branch point per variation**: branch on a set of variations (e.g., screens, formats, handlers) in exactly one dispatch or registration point so adding a new variation updates one location rather than scattering edits.
 
-- Prefer structures where adding a variation (new screen, format, identifier) means adding a new unit plus a registration, not editing branches across existing code
+### Leave No Vestiges
+
+Code reads as if the current design were the only one ever written.
+
+- **Delete superseded code completely**: remove unused implementations, unreachable branches, obsolete flags, dead fields/parameters, and commented-out code; rely on version control history rather than dead remnants.
+- **No relational naming**: name replacements canonically rather than relative to predecessors (e.g., `_old`, `_new`, `V2`, `Legacy`, `Ex`); version tokens belong only in externally published interface identifiers.
+- **External compatibility exception**: retain a legacy path only while external consumers outside the repository (e.g., published APIs, persisted formats, wire protocols) still depend on it — except where a domain rule expressly forbids compatibility aliases (such as published CLI options or subcommands under `cli.md`, when present); update all in-repository callers in the same change.
+- **Document retained compatibility**: attach a comment at any retained external compatibility path naming the external dependent and the exact condition that retires it.
 
 ### Enforce Invariants in Code
 
-- Prefer compile-time impossibility over runtime checks: where practical, express the rule in types (stage-specific interface return types for call order, required constructor arguments, narrowed parameter types) so violations do not compile
-- When a rule can be broken silently (wrong call order, configuration after startup, out-of-range values), make the code fail fast with a clear message instead of relying on documentation
-- The error message should state the rule itself
+- **Make invalid states unrepresentable**: encode ordering, required arguments, and value constraints in types or constructors wherever the language's type system supports it so invalid usage fails at compile time or construction time rather than downstream.
+- **Validate at every entry to a constrained type**: enforce the invariant in every constructor, mutator, and default path so no invalid instance can exist.
+- **Trust validated types downstream**: code receiving an invariant-enforcing type relies on the invariant without redundant defensive checks or assertions.
+- **Fail fast on silent program contract breaks**: verify programmatic state-machine order, post-initialization immutability, and out-of-range internal arguments immediately with an error naming the violated rule. (Settings read at startup follow `configuration.md` when present.)
+
+### Named Constants
+
+- **Name non-evident or synchronized literals**: extract a literal into a named constant in its owning module or class (rather than a catch-all constants file) whenever its meaning is not self-evident at the use site or when multiple sites must keep holding the same value. Keep self-evident literals (e.g., `0`, `1`, empty string) inline, and treat field-adjustable values as configuration (`configuration.md`, when present).
+
+### Resource and Lifetime Discipline
+
+- **Release owned resources deterministically**: close or dispose every owned external or unmanaged resource (e.g., file handles, streams, sockets, database connections, locks) on every exit path, including failures.
+- **Unsubscribe shorter-lived listeners**: detach event handlers, callbacks, and observers when the subscribing component's lifetime ends if the publisher can outlive it, preventing retained references and memory leaks.
+- **Resource use stays bounded whatever the input size**: processing whose memory, duration, or parameter count grows with the size or number of its inputs, and state kept across operations that grows with the inputs seen (e.g., a cache that keeps every key it has read), is bounded — by a limit on the input, beyond which the input is rejected; by processing the input in pieces (e.g., streaming, chunks, pages); or, for kept state, by a limit on its entries or their age. A limit is a named value, and the outcome beyond it is stated in the specification.
+
+### Writes That Hold Together
+
+Applies to every write to durable state (e.g., databases, files, outgoing messages).
+
+- **Atomic units**: group writes that are valid only together (e.g., header and line items, file and index record) into a single all-or-nothing transaction or atomic replace (e.g., write temporary file and rename) so partial failure leaves no inconsistent state.
+- **Safe to re-run**: operations interrupted midway by crashes, timeouts, or duplicate triggers produce the same valid end state when run again, because re-runners cannot tell how far a prior attempt got.
+- **Detect concurrent updates**: where concurrent actors can modify the same state, verify at write time that the underlying version or state read earlier has not changed, and report conflicts rather than silently overwriting earlier writes.
 
 ### Synchronous vs Asynchronous
 
-- Use async for I/O-bound work (network, DB, file access); keep CPU-bound and pure logic synchronous
-- Async propagates end-to-end: never block on async code (`.Result`, `.Wait()`, `GetAwaiter().GetResult()`)
-- Do not mark a method async when nothing in it awaits
-- Language files refine this per language/framework; they take precedence
+- **Async I/O, sync compute**: perform I/O-bound work asynchronously wherever the platform provides asynchronous APIs; keep CPU-bound and pure decision logic synchronous.
+- **Propagate async end-to-end**: never block synchronously on asynchronous work (e.g., waiting synchronously on an async handle or future), which risks deadlocks and thread exhaustion.
+- **No empty async**: never mark a function asynchronous unless it awaits genuine asynchronous work.
+- **Propagate cancellation end-to-end**: pass cancellation signals through all cancellable I/O operations so callers can abort work cleanly; omit cancellation **only** for the four non-cancellable completion steps — logging/telemetry, transaction rollback, best-effort cleanup, and post-commit finalization whose interruption would leave committed state inconsistent.
+- Stack rules refine concurrency primitives and signatures per stack and take precedence.
+
+---
+
+## Code Organization
+
+Applies to how source files, namespaces or modules, folders, and compilation units are structured.
+
+- **Predictable file-to-symbol mapping**: name source files after the cohesive type, module, or feature unit they define (following the stack's convention — e.g., one top-level type per file in C#/Java, or cohesive feature modules in languages where related small types share a file) so every symbol is located directly from filenames without searching.
+- **Logical modules match folder layout**: align each file's namespace, package, or module path with its directory path relative to the project root so logical names and filesystem paths never diverge.
+- **Organize folders by business feature**: when a project creates subdirectories (instead of keeping a single flat root folder), group code that changes together for one business area or feature into that feature's folder rather than splitting files across top-level technical-layer folders (e.g., `ViewModels/`, `Services/`, `Repositories/`), and avoid duplicating layer-named subfolders inside feature folders unless a compiler or deployment boundary requires them; place cross-cutting mechanisms in their own shared home (`One Home per Piece of Knowledge`). *Overlap with Separation of Concerns and Dependency Direction*: `Separation of Concerns` and `Dependency Direction` govern responsibility boundaries and dependency direction between types, whereas feature organization governs which folders hold those types.
 
 ---
 
 ## Code Comments
 
-### Principle
+A comment exists only where clearer names, types, extracted functions, tests, or fail-fast checks cannot express the context — it tells a blank-slate reader **why the current code shape, order, or guard is required now**.
 
-Comments are generally unnecessary. Prefer clear names, simple structure, and code that explains itself.
-
-Write a comment only when the code cannot express the necessary context by itself. A useful comment explains **why the current shape, condition, guard, or order must be this way now**.
-
-Even a justified comment is capped at a short conclusion (1–2 lines):
-
-- Check Enforce Invariants in Code first — a constraint that types or a fail-fast check can enforce needs neither a comment nor an ADR
-- When an ADR covers the context, the comment states only the conclusion plus the ADR path
-- Context that does not fit in those two lines is document-sized: its body belongs in an ADR or `docs/references/`, with a one-line conclusion plus the path left at the site. Add it to the document that already covers the subject; a new file is warranted only when the context stands on its own as a decision or a durable fact
-
-Before writing a comment, ask:
-
-- Can a better name, extracted function, type, or test make this clear? If yes, do that instead.
-- Is this about what changed, what was removed, who requested it, or how it was aligned? If yes, put it in Git history, a PR, a ticket, or a design document, not in code.
-- Can the comment be phrased as "this must be this way because..." in terms of the current behavior? If not, do not write it.
-
-### Good Comments
-
-Good comments explain current constraints that code cannot show:
-
-- Business rules that are not obvious from the code
-- External constraints such as API limits, protocol requirements, or legacy system behavior
-- Invariants, ordering requirements, and exceptional states
-- Non-obvious guards that are required only in specific runtime states
-- Why the code has a shape a reader would not have chosen, when a measured result rejected the shape they would have chosen. State the measurement — that is what makes the comment checkable later, and deletable when the measurement stops holding
-
-```csharp
-// config is null only on first launch (before the settings file is generated)
-if (config != null) { ... }
-
-// The contractual matching key is aaa only; extra conditions drop update history (rationale: docs/adr/0002-order-matching-key.md)
-var sql = "SELECT ... FROM [Order_TBL] WHERE aaa = @bbb";
-
-// Three passes over 200k rows cost 400ms; one pass keeps the report inside its 1s budget
-var count = 0; var sum = 0m; var max = decimal.MinValue;
-```
-
-### Do Not Write
-
-Do not write comments that explain the work history instead of the current constraint:
-
-- What was changed or removed
-- Commented-out code, conditions, fields, or parameters
-- Notes like "X removed", "X excluded", "changed after review", or "aligned with screen Y"
-- Comments that only restate the next line of code
-- Bare prohibitions without the current reason
-- Performance claims with nothing measured behind them ("for performance", "this is faster") — without the number, the claim cannot be checked, cannot be refuted, and no one dares delete it
-
-If the current code is clear without a comment, write no comment. If the reason matters, explain the reason as a current rule or constraint without preserving removed implementation details.
-
-### Where to Put What
-
-| Information Type | Location |
-|-----------------|----------|
-| Why the current shape/order/guard is required now | Code comment, only when code cannot express it |
-| External constraints, business rules, invariants | Code comment |
-| What was changed or removed | Git history / ChangeLog / Release notes |
-| Why code was changed | Git commit message / PR description |
-| Why something is prohibited | ADR (`docs/adr/`), plus a brief current reason at the usage site if needed |
-| Context needing more than 1–2 lines to explain | ADR (`docs/adr/`) or `docs/references/`, with a one-line conclusion + path comment at the site |
-| Implementation decisions | ADR (`docs/adr/`) or Docs (`docs/`) |
-| Author's work process (review fixes, what was aligned with) | Nowhere in code — that is what PR / commit history is for |
-
----
-
-## Testing
-
-### Environment Independence
-
-- Tests must not depend on the execution environment: OS culture/locale, timezone, machine state, pre-existing database contents, or network availability
-- When behavior depends on culture or time, pin them explicitly inside the test
-
-### Self-Sufficient Test Data
-
-- Each test creates the minimal data it needs (e.g., via test data builders with sensible defaults)
-- Do not depend on shared fixture databases or data prepared outside the test — shared mutable test data rots; per-test data keeps tests independent
-
-### Table-Driven Tests
-
-- When a function's spec is "input → output", write tests as a specification table (parameterized tests), not as near-identical separate test methods
-- Order rows consistently: null/none → empty → minimal → main cases → boundaries
-- Make input values self-describing so the table reads as documentation
+- **Explain current non-obvious constraints**: comment only on what code cannot show on its own (e.g., business rules, external API or protocol quirks, state-specific runtime invariants/ordering guards, or performance-driven shapes citing concrete measurements so the optimization stays verifiable and removable when conditions change).
+- **One constraint at the site; offload deep context**: state one constraint and its current reason directly at the code it shapes; move architectural rationale, prohibited alternatives, or multi-constraint specifications to an ADR (`docs/adr/`) or `docs/references/`, leaving a one-line conclusion and relative path in the comment.
+- **No restatements, history, or unmotivated claims**: never write comments that restate what code visibly does, commented-out code, change or review history (record what changed and why in commits, PR descriptions, or changelogs), prohibitions without a current reason, or unmeasured performance claims (e.g., "for performance", "faster").
 
 ---
 
 ## Specifications
 
-- **Spec-first**: when a change requires behavior not in the specification (`docs/specs/...`, listed in the `AGENTS.md` Applications table), update the specification before implementing. Never retro-fit the spec to the implementation afterwards
-- What a specification must contain and how it is structured is defined in `documentation.md`
+- **Spec-first**: update an application's specification (`docs/specs/...`, listed in `AGENTS.md` Applications) before implementing behavior it does not yet cover — never write it after implementing that behavior (specifying existing behavior from code follows `specs.md` Scope). Specification content and structure are governed by `documentation.md`; decision completeness is governed by `specs.md`.
 
 ---
 
 ## Version Display
 
-The first thing to establish about a reported problem is which build produced it. An
-application that cannot state its own version turns that into guesswork, and every answer
-after it is built on a guess.
+Establishing which release produced a behavior or failure comes first in diagnostics and support.
 
-- Every application must expose the version it was built with, in the form `<AppName> X.Y.Z` (e.g., `MyApp 1.22.3`)
-- `<AppName>` is the application's own name, spelled as the application spells it — the GUI and the CLI print the identical string
-- GUI applications display it somewhere always reachable in the UI (title bar, about screen, footer)
-- CLI applications provide `--version` / `-V`; the concrete requirements are in `cli.md`
-- The default format is the bare product version — no build hash, build date, or other metadata
-- The displayed value comes from the project's single version definition (see the language file's version-management rules), never from a hardcoded string
+- **Users can learn the version**: every standalone executable application (e.g., GUI, CLI, network service, or background worker; reusable libraries without their own executable entry point are exempt) gives its users a way to learn the release they are running (e.g., an About screen, a `--version` option, a startup log line). How the version is written and where it appears are left to the application, subject to any applicable conditional rule file (e.g., `cli.md` Version Output when present and applicable).
+- **Single version definition**: define the application's release version in one place in the project so every built artifact, package, and displayed version derives from that single source without drifting out of sync; fail fast rather than substituting a hardcoded fallback constant if version metadata is absent.
 
 ---
 
-## Configuration Values
+## Application-Owned Paths
 
-Applies to every value the application reads from outside its own code — configuration
-files, environment variables, and any other external store.
-
-- **Every configurable value has a built-in default in code**, and the application runs on that default whenever the external value is missing, unparsable, or out of range. A configuration source that is absent or corrupt never fails startup
-- **Validate on read**: replace or clamp invalid values while the configuration is being loaded, so no later code has to defend against them. The valid range belongs to the value's definition, not to checks scattered across its use sites
-- **Report every substitution once**, naming the value, what was rejected, and the default applied. A silent fallback hides operator mistakes and turns a typo into an invisible change of behavior
-- **Externalizing a value is a choice**: a value nobody adjusts in the field stays a named constant in code (see the language file's constants rule). Making it configurable adds the obligations above
-- This does not relax Enforce Invariants in Code — that rule governs values the program itself produces, where a violation is a defect and must fail fast. An external value is operator input: the program keeps running on a known-good value and reports what it rejected
-- Precedence between sources, for applications that expose a command line, is in `cli.md` (CONFIG)
-
-### Configuration Files in the Repository
-
-Applies to every configuration file that ships with the application — application
-settings, deployment descriptors, workflow definitions, and the like.
-
-- **The repository tracks a placeholder template, never a working configuration.** The tracked file is `<name>.template.<ext>` and carries placeholder values only; the file the application actually reads is derived from it and stays untracked. A working configuration holds the credentials, host names, and paths of whoever wrote it — committing one leaks them and makes every other environment inherit them
-- **A developer's own configuration is local to that developer.** Derive it from the template, keep it out of version control, and never treat it as a source of truth for anyone else
-- **What ships is derived from the template by the build**, so the distributed file is placeholder-clean by construction. Distribution never picks up a configuration file that happened to be sitting in a working tree
-- **Installation never overwrites an existing configuration.** The derived file is written only when none is present, so updating an installation keeps what the operator configured
-- The template is a real, complete configuration in shape: every key the application reads appears in it, so the file doubles as the documentation of what is configurable
+- **Anchor application-owned paths explicitly**: for every application-owned path — any path the application selects or constructs for its own files (e.g., configuration, local data, logs, bundled assets), as opposed to target paths supplied by a caller via CLI arguments, UI file pickers, or request payloads — resolve it relative to an explicit base the application controls (only one of: the application's executable directory, a platform-designated application-data directory, an absolute path from configuration, or — solely for transient per-operation temporary files — a platform-designated temporary directory; the specific location is decided by the specification), never relative to the process's current working directory, which varies by shortcut, scheduler, service manager, or parent process. (Where configuration supplies a relative path, either anchor it to an explicit base above — using the temporary directory solely for transient files — or handle it as an invalid configuration value per `configuration.md` Configuration Values when present, or reject it under `External Input` when `configuration.md` is absent; user-supplied relative CLI arguments intentionally resolve against the caller's working directory.)
+- **Keep persistent paths deterministic and stable**: place persistent application-owned files (e.g., configuration, user preferences, local data, logs) at explicit, deterministic paths controlled directly by the application (matching the specification) — never nested under runtime- or framework-generated non-deterministic or version-keyed directories (e.g., executable-location hashes, randomized provider folders, or per-version subdirectories), which silently disconnect updates or relocations from existing state, leave orphaned folders behind, and prevent operators from locating or backing up data. (Where the specification places portable persistent files beside the executable directory, those files intentionally travel with the application folder rather than depending on an external location hash. Transient per-operation temporary files — e.g., staging files under `file-exchange.md` when present, atomic-write temporary files, or isolated test scratch directories under `testing.md` — and unique item identifiers defined by the specification, such as content-addressed cache keys or uploaded object filenames, are outside this prohibition.)
 
 ---
 
-## Procedure Design
+## External Input
 
-Applies to any ordered sequence of steps written for someone — human or agent — to
-execute: guides (`docs/guides/`), release and migration steps, setup instructions, and
-step sequences delivered in a PR description or conversation. Where procedure documents
-are placed is `documentation.md`'s concern; this section governs how the steps
-themselves are designed.
+Applies to all data entering across an external trust boundary at run time — i.e., inputs received across a user interface, command line, file, external process, or network boundary rather than constructed by already-validated internal code. Settings read from configuration sources follow `configuration.md` when present, or the boundary validation rules below when `configuration.md` is absent; a setting a user enters through the application's own UI is input checked here when entered.
 
-### Design Before Writing
+- **Validate at the boundary**: check input size, shape, format, and range once where data enters the application (size limits per `Resource and Lifetime Discipline`), passing only validated types inward so inner code never repeats boundary checks.
+- **Canonicalize, then validate**: before checking, apply only the canonicalizations defined by the format's specification (e.g., trimming outer whitespace, normalizing line endings, Unicode normalization) and permitted formatting variants (e.g., grouping separators) — never guess intended values for malformed data.
+- **Reject, never repair**: reject invalid input (whole payload or failing independent items, per specification) with an error stating what failed, rather than silently altering invalid values into valid-looking ones nobody submitted.
 
-- Do not accrete steps ad hoc. Fix the entry state and the goal state first, then design
-  the path between them before writing any step
-- When the design stops holding mid-way, do not patch around it with extra steps —
-  return to the design, reorder, then rewrite
+---
 
-### Phases and Steps
+## Values Never Become Code
 
-- Structure any procedure beyond a few steps in two layers: phases (headings) and the
-  steps inside them. One phase = one concern; one step = one operation
-- The phase sequence alone must tell the whole story (e.g., prepare → change → verify →
-  clean up)
-- Do not split for splitting's sake: work that forms one responsibility stays in one
-  step, and a short procedure needs no phases — the same judgment as not creating a
-  folder for a single file
+- **Pass values as data**: never concatenate external, configured, or stored values into executable or interpreted text (e.g., SQL, shell commands, HTML, templates, query expressions); always use parameterized bindings, argument lists, or context-aware encoding.
+- **Whitelist fixed structural choices**: where a language position has no data-binding mechanism (e.g., SQL table or column names, sort keys), select only from a fixed set of code-defined alternatives and reject any other input.
+- **Forbid type-polymorphic deserialization of untrusted data**: never pass untrusted or external payloads into deserializers that embed type metadata to instantiate arbitrary types during parsing; deserialize strictly into explicit, statically known data shapes (`External Input`).
 
-### Motivated Order
+---
 
-- Adjacency is the only grouping device a document has. Code expresses relatedness
-  through folders and namespaces regardless of distance; a linear document cannot —
-  operations of the same kind scattered across distant steps lose their structure
-- Keep same-kind operations adjacent (e.g., one "update configuration" phase covering
-  app A, then app B) unless a dependency or verification requirement forces separation —
-  "change A, verify A, only then change B" is a valid reason to separate
-- Every step's position must be explainable by dependency, verification, or locality.
-  A step that could move elsewhere without breaking the procedure has no reason to be
-  where it is — regroup it
+## Failure Handling and Reporting
 
-### Step Contract
+- **Never swallow failures**: handle, recover explicitly, or report every caught failure — never ignore an exception or error silently.
+- **Never expose raw internal errors**: translate internal exceptions into safe user-facing messages rather than surfacing internal details (e.g., raw exception messages, stack traces, internal file paths such as installation or staging paths, or connection strings) in messages shown to end users; diagnostics for operators follow `Log each failure once`.
+- **Log each failure once**: the boundary that handles a failure without propagating it records the log entry; intermediate layers that rethrow or propagate never log it again.
+- **Unattended failures reach a person**: background jobs, services, and scheduled tasks report failures to an actively monitored channel (e.g., alert, monitored event log, scheduler failure exit code), never solely into a local file nobody checks.
+- **Attended failures guide the user**: interactive operations tell the user what failed and what action they can take next, never ending silently or crashing without explanation.
 
-- A step may rely only on explicitly stated inputs or the outputs of earlier steps —
-  no implicit preconditions. Reading top to bottom must never require looking ahead
-- Every step ends with a verifiable confirmation: not "done" but an observable check
-  ("the command exits 0", "the service responds on port 8080")
-- For substantial procedures, write each step as precondition / operation / confirmation
+---
 
-### Name the Place
+## Build Hygiene and Static Analysis
 
-- Steps adjacent in text implicitly claim "you are still in the same place". When that
-  claim is false, the reader hunts for a control that does not exist in front of them,
-  with no way to tell "wrong place" from "not found yet" — never leave the location
-  implicit
-- Every step names the place it operates in (URL, screen, full path), stated so the
-  reader can verify "am I here?" before looking for the operation's target. On the
-  named place with the item absent, the document is wrong — stop searching, fix the
-  document
-- Moving between places is itself an operation: when consecutive steps happen in
-  different places, write the transition as an explicit step
-- The named place is a claim about the external system, not about the document — verify
-  it against the actual structure (the real UI hierarchy, the real directory tree)
-  instead of assuming continuity from the previous step
-
-### Automation Boundary
-
-- Do not leave automatable work as manual steps out of inertia; fold it into existing
-  automation (build scripts, batch files) where one exists
-- Keep operations that require human judgment, and irreversible operations, as manual
-  steps, explicitly marked as such ("requires confirmation", "irreversible"). Do not
-  over-integrate
+- **Consistent automated formatting**: maintain formatting settings in repository-level style configuration without ad-hoc file-level deviations, and verify formatting with a non-modifying check before completing work.
+- **Recommended static analysis with zero warnings**: run the toolchain's standard recommended static analysis and treat warnings as errors so defects fail checks immediately; never lower or disable analysis gates globally — suppress an individual diagnostic only at the narrowest applicable scope (e.g., single line or statement, single declaration, generated file or folder, or single compilation unit) with a documented current constraint (never "for now" or "fix later").
+- **Centralized prohibited-API enforcement**: when the repository enforces a banned-API list, define prohibited APIs in one repository-level list without folder exemptions so forbidden calls fail consistently; remove an API from the list rather than exempting individual callers if any legitimate use exists.
+- **Keep generated build outputs out of version control**: exclude compiler, bundler, and packager build outputs from version control in every repository regardless of whether it ships distributables, preventing stale or environment-specific artifacts from entering repository history.
+- **Known-vulnerable dependencies are found**: check third-party dependencies against vulnerability advisories during builds or on a regular maintenance schedule, and resolve critical or high-severity disclosures promptly.
+- **Gated distributable builds**: where the application produces distributable artifacts, produce them solely through the repository's gated build pipeline (after format verification and tests pass) rather than ad-hoc manual packaging.
 
 ---
 
 ## AUDIT
 
-Run this procedure after completing an implementation task and **before reporting it as
-complete**. Do not report completion until AUDIT passes.
+Run this procedure after completing every implementation task (`Completion requirement` above). Do not report a task complete until AUDIT passes.
 
-### 1. Reload the rules
-
-- Re-read the root `AGENTS.md`, and any nested `AGENTS.md` covering the directories you touched
-- Re-read this file, every applicable language file in this directory, and the rules files of the applications you touched (skim is enough if already read this session and unchanged)
-
-### 2. Identify target files
-
-Git changes determine which **files** are targets — not which lines.
-
-| Input | Targets |
-|-------|---------|
-| (none specified) | All uncommitted changes: `git status --porcelain` (modified, added, untracked) |
-| A file path | Only that file |
-| A folder path | Files in that folder only |
-
-Check ALL target files. Do not skip any. Do not sample.
-
-### 3. Check file contents
-
-Once a file is a target, **every line in that file** is subject to all rules — do not
-distinguish between changed and pre-existing lines; a violation is a violation regardless
-of when it was introduced. Check each target file against:
-
-- The core principles in this file
-- Every language-file rule whose enforcement matrix row says **AUDIT** (skip rules marked as mechanically enforced — the build gate covers them; but if the repository lacks the enforcing mechanism, treat those rules as AUDIT items too)
-- The application-specific rules from the application's rules file (and any other repository-authored files under `docs/rules/`)
-- The application's specification (`docs/specs/...`): implemented behavior must match it, and any needed spec change must have happened before the implementation, never as an after-the-fact edit
-- If the task created, changed, moved, renamed, archived, or deleted any document, also check it against `documentation.md`; if the task performed a Git write or PR operation, also check it against `git.md`
-
-### 4. Run the mechanical gates
-
-Run the commands defined in `AGENTS.md`: the formatter in check mode, the build
-(zero warnings), and the tests. All must pass.
-
-### 5. Fix and report
-
-Fix violations and re-run from step 2. Report completion only when clean, including:
-
-- Files checked
-- Violations found and fixed (file / line / rule), or "no violations"
-- Gate results with exit codes
-- Anything deliberately left unresolved, stated explicitly
+1. **Reload the rules**: re-read the root `AGENTS.md`, any nested `AGENTS.md` covering touched paths, every applicable file under `docs/rules/`, the specification (plus any behavior ledgers per `specs.md`) of every touched application, and any existing deferred-violation notes under `docs/notes/` covering touched scopes. Files already read in full during the same session and unchanged since need not be re-read.
+2. **Identify target files**: determine targets from uncommitted version-control changes (modified, added, untracked), or from an explicitly requested file or folder. Inspect the entire content of every target file — finding the violations already present in a touched file as well as those the change introduces — and sample or skip no target file.
+3. **Verify target files against rules and specifications**:
+   - **Shared rules in every target file**: zero violations introduced by the change across every universal file and every conditional rule file whose `Applies when` condition holds for the touched application after the change (evaluated as a fact about the application, never whether the task touches that subject); violations already present before the change are handled in step 5.
+   - **Missing conditional domain coverage**: check whether the change introduces or expands behavior in any conditional shared domain listed under `How to Use These Rules` (`Missing conditional rules`) whose rule file is absent from `docs/rules/`; report any missing file(s) to the user in step 5.
+   - **No duplicated knowledge repository-wide**: inspect every added function, type, or constant against the entire repository (`One Home per Piece of Knowledge`).
+   - **Stack rules in every target file**: zero violations of every rule marked `AUDIT` in any applicable stack rule file's enforcement matrix (when present), and of any `Enforced` rule whose mechanical gate is missing from the repository, introduced by the change.
+   - **Application rules in every target file**: zero violations of repository-authored rules under `docs/rules/` introduced by the change.
+   - **Specification alignment**: implemented behavior matches the application specification under `docs/specs/`, with specification updates committed before or alongside implementation — excluding untouched legacy decisions outside `specs.md` scope (`specs.md` Scope) and pre-existing behavior currently tracked in `docs/references/<App>/unconfirmed-behavior.md` or `docs/references/<App>/violating-behavior.md` unless the change alters that behavior.
+4. **Run mechanical gates**: execute every verification command listed in `AGENTS.md` (format verification, zero-warning build, unit and boundary tests — omitting any not applicable to the repository) and confirm exit code 0. End-to-end tests follow the schedule in `testing.md`.
+5. **Fix and report**: fix every violation the change introduced, repeating from step 2 until none remains. Report the violations already present in target files without fixing them — mixing their repair into the change hides the change's own behavior in review — and fix one only when the user decides to (for decision violations, per `specs.md` Handling Each Class). Record the ones the user defers: decision violations in `docs/references/<App>/violating-behavior.md` per `specs.md` (moving any contradicted requirement out of `docs/specs/`), and other code or documentation violations under `docs/notes/` (e.g., `docs/notes/<App>/deferred-violations.md` or `docs/notes/deferred-violations.md`). Report completion listing the files checked, any missing conditional rule files, violations found and fixed (or "no violations"), mechanical gate outcomes with exit codes, and any user-deferred items.
