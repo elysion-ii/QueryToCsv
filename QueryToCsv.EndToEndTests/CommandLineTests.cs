@@ -75,8 +75,8 @@ public sealed class CommandLineTests : IDisposable
     }
 
     [Theory]
-    [InlineData("Server=x;TrustServerCertificate=True;", "must not set TrustServerCertificate")]
-    [InlineData("Server=x;Password=secret;", "must not contain a password")]
+    [InlineData("Server=x;TrustServerCertificate=True;Encrypt=False;", "must not turn encryption off")]
+    [InlineData("Server=x;TrustServerCertificate=True;Password=secret;", "must not contain a password")]
     [Trait("Requirement", "QTC-7")]
     internal async Task UnsafeConnectionString_EndsTheRunBeforeConnecting(string connectionString, string expected)
     {
@@ -86,6 +86,8 @@ public sealed class CommandLineTests : IDisposable
 
         Assert.Equal(1, result.ExitCode);
         Assert.Contains($"QueryToCsv: Connections[0].ConnectionString {expected}", result.Error, StringComparison.Ordinal);
+        // A run that ends on the configuration connects nowhere, so nothing warns about it.
+        Assert.DoesNotContain("insecure setting", result.Error, StringComparison.Ordinal);
         Assert.DoesNotContain("secret", _app.LogText(), StringComparison.Ordinal);
     }
 

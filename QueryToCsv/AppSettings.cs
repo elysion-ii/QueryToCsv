@@ -112,40 +112,46 @@ internal sealed class AppSettings
         return (settings, notices);
     }
 
-    // The first reason the configuration cannot be used, or null when it can, checked in
-    // entry order. Connections is required input rather than a defaulted value: no
-    // built-in value can name the server an operator means to query
-    // (docs/rules/QueryToCsv.md, Required Input; docs/specs/QueryToCsv.md, QTC-7).
-    internal string? ValidationError()
+    // The first reason the connections cannot be used, checked in entry order; or, when
+    // they can, one warning per entry whose server certificate goes unvalidated. A run
+    // that ends on an error connects nowhere, so it carries no warning. Connections is
+    // required input rather than a defaulted value: no built-in value can name the server
+    // an operator means to query (docs/rules/QueryToCsv.md, Required Input;
+    // docs/specs/QueryToCsv.md, QTC-7).
+    internal (string? Error, IReadOnlyList<string> Warnings) ValidateConnections()
     {
         if (Connections.Count == 0)
-            return "Connections must contain at least one entry.";
+            return ("Connections must contain at least one entry.", []);
 
+        List<string> warnings = [];
         for (int i = 0; i < Connections.Count; i++)
         {
-            string? error = ConnectionError(Connections[i], i);
+            (string? error, string? warning) = CheckConnection(Connections[i], i);
             if (error is not null)
-                return error;
+                return (error, []);
+
+            if (warning is not null)
+                warnings.Add(warning);
         }
 
-        return null;
+        return (null, warnings);
     }
 
-    private string? ConnectionError(ConnectionEntry entry, int index)
+    private (string? Error, string? Warning) CheckConnection(ConnectionEntry entry, int index)
     {
         string prefix = $"Connections[{index}]";
 
         if (string.IsNullOrWhiteSpace(entry.Name))
-            return $"{prefix}.Name is required.";
+            return ($"{prefix}.Name is required.", null);
 
         for (int earlier = 0; earlier < index; earlier++)
         {
             if (string.Equals(Connections[earlier].Name, entry.Name, StringComparison.OrdinalIgnoreCase))
-                return $"{prefix}.Name \"{entry.Name}\" is already used by Connections[{earlier}].";
+                return ($"{prefix}.Name \"{entry.Name}\" is already used by Connections[{earlier}].", null);
         }
 
         if (string.IsNullOrWhiteSpace(entry.ConnectionString))
-            return $"{prefix}.ConnectionString is required.";
+            return ($"{prefix}.ConnectionString is required.", null);
 
         SqlConnectionStringBuilder builder;
         try
@@ -154,35 +160,38 @@ internal sealed class AppSettings
         }
         catch (Exception ex) when (ex is ArgumentException or FormatException or KeyNotFoundException)
         {
-            return $"{prefix}.ConnectionString is not a valid connection string.";
+            return ($"{prefix}.ConnectionString is not a valid connection string.", null);
         }
 
-        // A connection that accepts any certificate, or none, can be read and altered on
-        // the way (docs/rules/db.md, Encrypted connections verify the server).
-        if (builder.TrustServerCertificate)
-        {
-            return $"{prefix}.ConnectionString must not set TrustServerCertificate; give the server a certificate "
-                + "the client trusts, or pin it with \"Server Certificate\".";
-        }
-
+        // An unencrypted connection can be read on the way
+        // (docs/rules/db.md, Encrypted connections verify the server).
         if (SqlConnectionEncryptOption.Optional.Equals(builder.Encrypt))
-            return $"{prefix}.ConnectionString must not turn encryption off.";
+            return ($"{prefix}.ConnectionString must not turn encryption off.", null);
 
         // A password in a plain-text file can be read by anyone who can read the folder
         // (docs/rules/security.md, Store secrets in platform secret stores).
         if (builder.Password.Length > 0)
         {
-            return $"{prefix}.ConnectionString must not contain a password; store it in Windows Credential Manager "
-                + $"and name it in {prefix}.Credential.";
+            return ($"{prefix}.ConnectionString must not contain a password; store it in Windows Credential Manager "
+                + $"and name it in {prefix}.Credential.", null);
         }
 
         if (builder.UserID.Length > 0)
-            return $"{prefix}.ConnectionString must not contain a user name; it comes from {prefix}.Credential.";
+            return ($"{prefix}.ConnectionString must not contain a user name; it comes from {prefix}.Credential.", null);
 
         if (entry.Credential is not null && string.IsNullOrWhiteSpace(entry.Credential))
-            return $"{prefix}.Credential is blank.";
+            return ($"{prefix}.Credential is blank.", null);
 
-        return null;
+        // The operator may accept an unvalidated certificate, but never silently
+        // (docs/rules/QueryToCsv.md, Server Certificate Validation).
+        if (builder.TrustServerCertificate)
+        {
+            return (null, $"{prefix} \"{entry.Name}\" contains an insecure setting: TrustServerCertificate=True accepts "
+                + "any server certificate, so the connection can be intercepted. Give the server a certificate the "
+                + "client trusts, or pin it with \"Server Certificate\".");
+        }
+
+        return (null, null);
     }
 
     private static AppSettings Defaults(string baseDirectory) => new()

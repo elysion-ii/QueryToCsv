@@ -51,8 +51,14 @@ public class AppSettingsTests
         },
     };
 
-    // Connections entries (name, connection string, credential) -> the error reported
-    public static TheoryData<string, string, string?, string?> ConnectionEntries() => new()
+    private const string PasswordError =
+        "Connections[0].ConnectionString must not contain a password; store it in Windows Credential Manager and name "
+        + "it in Connections[0].Credential.";
+
+    private const string EncryptionOffError = "Connections[0].ConnectionString must not turn encryption off.";
+
+    // Rejected Connections entries (name, connection string, credential) -> the error reported
+    public static TheoryData<string, string, string?, string> RejectedConnectionEntries() => new()
     {
         { "", Usable, null, "Connections[0].Name is required." },
         { "   ", Usable, null, "Connections[0].Name is required." },
@@ -60,24 +66,14 @@ public class AppSettingsTests
         { "Dev", "   ", null, "Connections[0].ConnectionString is required." },
         { "Dev", "garbage", null, "Connections[0].ConnectionString is not a valid connection string." },
         { "Dev", "Server=x;NoSuchKeyword=1;", null, "Connections[0].ConnectionString is not a valid connection string." },
-        {
-            "Dev", "Server=x;TrustServerCertificate=True;", null,
-            "Connections[0].ConnectionString must not set TrustServerCertificate; give the server a certificate the client "
-            + "trusts, or pin it with \"Server Certificate\"."
-        },
-        { "Dev", "Server=x;Encrypt=False;", null, "Connections[0].ConnectionString must not turn encryption off." },
-        { "Dev", "Server=x;Encrypt=No;", null, "Connections[0].ConnectionString must not turn encryption off." },
-        { "Dev", "Server=x;Encrypt=Optional;", null, "Connections[0].ConnectionString must not turn encryption off." },
-        {
-            "Dev", "Server=x;Password=secret;", null,
-            "Connections[0].ConnectionString must not contain a password; store it in Windows Credential Manager and name "
-            + "it in Connections[0].Credential."
-        },
-        {
-            "Dev", "Server=x;PWD=secret;", null,
-            "Connections[0].ConnectionString must not contain a password; store it in Windows Credential Manager and name "
-            + "it in Connections[0].Credential."
-        },
+        { "Dev", "Server=x;Encrypt=False;", null, EncryptionOffError },
+        { "Dev", "Server=x;Encrypt=No;", null, EncryptionOffError },
+        { "Dev", "Server=x;Encrypt=Optional;", null, EncryptionOffError },
+        // Accepting an unvalidated certificate relaxes nothing else.
+        { "Dev", "Server=x;TrustServerCertificate=True;Encrypt=False;", null, EncryptionOffError },
+        { "Dev", "Server=x;Password=secret;", null, PasswordError },
+        { "Dev", "Server=x;PWD=secret;", null, PasswordError },
+        { "Dev", "Server=x;TrustServerCertificate=True;Password=secret;", null, PasswordError },
         {
             "Dev", "Server=x;User ID=sa;", null,
             "Connections[0].ConnectionString must not contain a user name; it comes from Connections[0].Credential."
@@ -87,11 +83,22 @@ public class AppSettingsTests
             "Connections[0].ConnectionString must not contain a user name; it comes from Connections[0].Credential."
         },
         { "Dev", Usable, "  ", "Connections[0].Credential is blank." },
-        // Accepted: Windows authentication, a credential, a pinned certificate, strict encryption
-        { "Dev", "Server=x;Database=y;Integrated Security=True;", null, null },
-        { "Dev", Usable, "QueryToCsv/Dev", null },
-        { "Dev", "Server=x;Encrypt=Strict;Server Certificate=C:\\certs\\x.cer;", null, null },
-        { "Dev", "Server=x;Encrypt=True;", null, null },
+    };
+
+    // Accepted Connections entries (connection string, credential) -> whether the entry is
+    // warned about as accepting any server certificate
+    public static TheoryData<string, string?, bool> AcceptedConnectionEntries() => new()
+    {
+        { "Server=x;Database=y;Integrated Security=True;", null, false },
+        { Usable, "QueryToCsv/Dev", false },
+        { "Server=x;Encrypt=True;", null, false },
+        { "Server=x;Encrypt=Strict;Server Certificate=C:\\certs\\x.cer;", null, false },
+        { "Server=x;TrustServerCertificate=False;", null, false },
+        { "Server=x;TrustServerCertificate=True;", null, true },
+        { "Server=x;Database=y;Integrated Security=True;TrustServerCertificate=yes;", null, true },
+        { "Server=x;Encrypt=Mandatory;TrustServerCertificate=True;", "QueryToCsv/Dev", true },
+        // The setting alone decides, whatever Encrypt says.
+        { "Server=x;Encrypt=Strict;TrustServerCertificate=True;", null, true },
     };
 
     [Theory]
@@ -226,34 +233,97 @@ public class AppSettingsTests
     }
 
     [Theory]
-    [MemberData(nameof(ConnectionEntries))]
+    [MemberData(nameof(RejectedConnectionEntries))]
     [Trait("Requirement", "QTC-7")]
-    internal void ValidationError_ConnectionEntry_ReportsTheFirstProblem(
+    internal void ValidateConnections_RejectedEntry_ReportsTheFirstProblemAndNoWarning(
         string name,
         string connectionString,
         string? credential,
-        string? expected)
+        string expected)
     {
         var settings = new AppSettings
         {
             Connections = [new ConnectionEntry { Name = name, ConnectionString = connectionString, Credential = credential }],
         };
 
-        Assert.Equal(expected, settings.ValidationError());
+        (string? error, IReadOnlyList<string> warnings) = settings.ValidateConnections();
+
+        Assert.Equal(expected, error);
+        Assert.Empty(warnings);
+    }
+
+    [Theory]
+    [MemberData(nameof(AcceptedConnectionEntries))]
+    [Trait("Requirement", "QTC-7")]
+    internal void ValidateConnections_AcceptedEntry_WarnsOnlyWhenTheCertificateGoesUnvalidated(
+        string connectionString,
+        string? credential,
+        bool warned)
+    {
+        var settings = new AppSettings
+        {
+            Connections = [new ConnectionEntry { Name = "Dev", ConnectionString = connectionString, Credential = credential }],
+        };
+
+        (string? error, IReadOnlyList<string> warnings) = settings.ValidateConnections();
+
+        string[] expected = warned ? [InsecureCertificateWarning(0, "Dev")] : [];
+        Assert.Null(error);
+        Assert.Equal(expected, warnings);
     }
 
     [Fact]
     [Trait("Requirement", "QTC-7")]
-    internal void ValidationError_NoConnections_NamesTheMissingSetting()
+    internal void ValidateConnections_SeveralUnvalidatedCertificates_WarnsOncePerEntryInOrder()
+    {
+        var settings = new AppSettings
+        {
+            Connections =
+            [
+                new ConnectionEntry { Name = "Takai", ConnectionString = "Server=a;Integrated Security=True;TrustServerCertificate=True;" },
+                new ConnectionEntry { Name = "Dev", ConnectionString = Usable },
+                new ConnectionEntry { Name = "Old", ConnectionString = "Server=b;TrustServerCertificate=True;", Credential = "QueryToCsv/Old" },
+            ],
+        };
+
+        (string? error, IReadOnlyList<string> warnings) = settings.ValidateConnections();
+
+        Assert.Null(error);
+        Assert.Equal([InsecureCertificateWarning(0, "Takai"), InsecureCertificateWarning(2, "Old")], warnings);
+        Assert.All(warnings, warning => Assert.DoesNotContain("Server=", warning, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Requirement", "QTC-7")]
+    internal void ValidateConnections_UnvalidatedCertificateBeforeABrokenEntry_ReportsOnlyTheError()
+    {
+        var settings = new AppSettings
+        {
+            Connections =
+            [
+                new ConnectionEntry { Name = "Takai", ConnectionString = "Server=a;TrustServerCertificate=True;" },
+                new ConnectionEntry { Name = "", ConnectionString = Usable },
+            ],
+        };
+
+        (string? error, IReadOnlyList<string> warnings) = settings.ValidateConnections();
+
+        Assert.Equal("Connections[1].Name is required.", error);
+        Assert.Empty(warnings);
+    }
+
+    [Fact]
+    [Trait("Requirement", "QTC-7")]
+    internal void ValidateConnections_NoConnections_NamesTheMissingSetting()
     {
         var settings = new AppSettings();
 
-        Assert.Equal("Connections must contain at least one entry.", settings.ValidationError());
+        Assert.Equal("Connections must contain at least one entry.", settings.ValidateConnections().Error);
     }
 
     [Fact]
     [Trait("Requirement", "QTC-7")]
-    internal void ValidationError_SeveralIncompleteEntries_ReportsOnlyTheFirstInOrder()
+    internal void ValidateConnections_SeveralIncompleteEntries_ReportsOnlyTheFirstInOrder()
     {
         var settings = new AppSettings
         {
@@ -265,12 +335,12 @@ public class AppSettingsTests
             ],
         };
 
-        Assert.Equal("Connections[1].ConnectionString is required.", settings.ValidationError());
+        Assert.Equal("Connections[1].ConnectionString is required.", settings.ValidateConnections().Error);
     }
 
     [Fact]
     [Trait("Requirement", "QTC-7")]
-    internal void ValidationError_NameReusedIgnoringCase_NamesBothEntries()
+    internal void ValidateConnections_NameReusedIgnoringCase_NamesBothEntries()
     {
         var settings = new AppSettings
         {
@@ -282,7 +352,7 @@ public class AppSettingsTests
             ],
         };
 
-        Assert.Equal("Connections[2].Name \"dev\" is already used by Connections[0].", settings.ValidationError());
+        Assert.Equal("Connections[2].Name \"dev\" is already used by Connections[0].", settings.ValidateConnections().Error);
     }
 
     [Fact]
@@ -300,6 +370,13 @@ public class AppSettingsTests
         Assert.Equal("CRLF", settings.CsvSettings.NewLine);
         Assert.Null(settings.CsvSettings.DateFormat);
     }
+
+    // Written out in full rather than built from the production text, so a change to the
+    // message fails here (docs/specs/QueryToCsv.md, QTC-7).
+    private static string InsecureCertificateWarning(int index, string name)
+        => $"Connections[{index}] \"{name}\" contains an insecure setting: TrustServerCertificate=True accepts any server "
+            + "certificate, so the connection can be intercepted. Give the server a certificate the client trusts, or pin "
+            + "it with \"Server Certificate\".";
 
     private static string WholeNumber(string key, string value, string max)
         => $"{key} \"{value}\" is not a whole number from 1 to {max}; using 30.";

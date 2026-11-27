@@ -31,6 +31,29 @@ no default, and which default substitutions are reported.
   substitution, a missing value included; here only a value that is present and unusable
   is reported, and a key the operator left out takes its default silently
 
+## Server Certificate Validation
+
+Overrides `db.md` (Encrypted connections verify the server) and `security.md` (Protect
+sensitive data in transit) on one point only: an operator may set
+`TrustServerCertificate=True` in a connection string.
+
+- **Why**: a SQL Server that uses its self-generated certificate regenerates it on every
+  service restart, so the certificate can be neither trusted through a root nor pinned
+  with `Server Certificate`. Rejecting the setting leaves such an installation unusable
+  until the server is given a real certificate, and whether to accept the interception
+  risk meanwhile is the operator's decision, not the tool's
+- **The risk is never silent**: every run that is about to connect warns, once per
+  entry, that the entry accepts any server certificate, naming the entry and never
+  printing its connection string (QTC-7 in `docs/specs/QueryToCsv.md`). The warning
+  depends on the setting alone, never on how the driver combines it with other keywords
+  (e.g., `Encrypt=Strict`), because that driver behavior cannot be verified against the
+  test-run server, and an unverified exemption could let an unvalidated connection pass
+  without a warning
+- **Everything else stays rejected**: turning encryption off, and putting a user name or
+  password in the connection string, still end the run. The application never sets
+  `TrustServerCertificate` itself, and the shipped template and documented examples keep
+  the validated form
+
 ## Application Rules
 
 - **Only SELECT statements may reach the server.** `QueryExecutor.IsSelectOnly` parses

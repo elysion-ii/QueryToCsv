@@ -120,6 +120,39 @@ public sealed class ExportTests : IDisposable
     }
 
     [Fact]
+    [Trait("Requirement", "QTC-7")]
+    [Trait("Requirement", "QTC-13")]
+    internal async Task OneLiner_TrustServerCertificate_ConnectsAndWarnsWithoutTheConnectionString()
+    {
+        string connectionString = _server.ConnectionStringTrustingAnyCertificate;
+        _app.WriteSettings(new
+        {
+            Connections = new[] { new { Name = "Takai", ConnectionString = connectionString, Credential = _credential.TargetName } },
+        });
+
+        AppResult result = await _app.RunAsync(["--query", "SELECT 1 AS a"]);
+
+        Assert.Equal(0, result.ExitCode);
+        string csv = Assert.Single(_app.OutputFiles());
+        Assert.Equal("a\r\n1\r\n", File.ReadAllText(csv));
+
+        const string Warning =
+            "Connections[0] \"Takai\" contains an insecure setting: TrustServerCertificate=True accepts any server "
+            + "certificate, so the connection can be intercepted. Give the server a certificate the client trusts, or pin "
+            + "it with \"Server Certificate\".";
+        string[] errorLines = result.Error.Split(Environment.NewLine);
+        Assert.Single(errorLines, line => line == "QueryToCsv: " + Warning);
+        string log = _app.LogText();
+        Assert.Contains("[WARN ] " + Warning, log, StringComparison.Ordinal);
+
+        foreach (string text in new[] { result.Output, result.Error, log })
+        {
+            Assert.DoesNotContain(connectionString, text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(_server.Server, text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     [Trait("Requirement", "QTC-8")]
     internal async Task MissingCredential_EndsTheRunBeforeConnecting()
     {

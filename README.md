@@ -47,11 +47,23 @@ copy appsettings.template.json appsettings.json
 
 Define one or more named connections in the `Connections` array. At startup, you choose which connection to use (or it is selected automatically if only one is defined).
 
-Connection names must be unique (ignoring case). Every connection is encrypted and the
-server's certificate is validated: a connection string that sets
-`TrustServerCertificate=True` or turns encryption off is rejected at startup. A server
-whose certificate does not chain to a trusted root can be pinned with
-`Server Certificate=<path to its .cer file>`.
+Connection names must be unique (ignoring case). Every connection is encrypted: a
+connection string that turns encryption off is rejected at startup. The server's
+certificate is validated, and a server whose certificate does not chain to a trusted root
+can be pinned with `Server Certificate=<path to its .cer file>`.
+
+A server that uses SQL Server's self-generated certificate gets a new certificate on every
+service restart, so it can be neither trusted nor pinned. For such a server you can set
+`TrustServerCertificate=True` and accept that the connection can be intercepted. Every run
+that connects then warns about each such entry, without printing its connection string:
+
+```
+QueryToCsv: Connections[0] "Takai" contains an insecure setting: TrustServerCertificate=True accepts any server certificate, so the connection can be intercepted. Give the server a certificate the client trusts, or pin it with "Server Certificate".
+```
+
+The warning does not change the exit code. It disappears once the entry no longer sets
+`TrustServerCertificate=True`: give the server a certificate the client trusts, or pin
+its certificate with `Server Certificate`, then remove the setting.
 
 **SQL Server Authentication** (user name and password from Windows Credential Manager):
 
@@ -236,7 +248,7 @@ All settings are in `appsettings.json`.
 |-----|------|----------|---------|-------------|
 | `Connections[]` | array | Yes | - | Array of named connection entries |
 | `Connections[].Name` | string | Yes | - | Display name shown in the selection menu |
-| `Connections[].ConnectionString` | string | Yes | - | SQL Server connection string, without user name or password, with encryption and certificate validation on |
+| `Connections[].ConnectionString` | string | Yes | - | SQL Server connection string, without user name or password, with encryption on; `TrustServerCertificate=True` is accepted with a warning |
 | `Connections[].Credential` | string | No | - | Windows Credential Manager generic credential holding the SQL Server user name and password |
 | `QueryFolder` | string | No | `queries` next to the executable | Folder containing `.sql` files |
 | `OutputFolder` | string | No | `output` next to the executable | Folder for CSV output |
@@ -330,7 +342,8 @@ The timestamp is the machine's local time. If a file with the same name already 
 | `appsettings.json` missing or unparseable | Reported as a warning; the run continues on the built-in defaults |
 | Unusable config value | Reported as a warning naming the setting and the default applied; the run continues |
 | No connection configured | `QueryToCsv: Connections must contain at least one entry.`, exit code 1 |
-| Connection entry incomplete, duplicated, or unsafe | `QueryToCsv: Connections[<index>]...` naming the problem (missing name or connection string, reused name, invalid connection string, `TrustServerCertificate`, encryption off, user name or password in the string), exit code 1 |
+| Connection entry incomplete, duplicated, or unsafe | `QueryToCsv: Connections[<index>]...` naming the problem (missing name or connection string, reused name, invalid connection string, encryption off, user name or password in the string), exit code 1 |
+| Connection entry sets `TrustServerCertificate=True` | Reported as a warning naming the entry; the run continues |
 | `Credential` not in Windows Credential Manager | `QueryToCsv: credential "<name>" was not found in Windows Credential Manager.`, exit code 1 |
 | `QueryFolder` does not exist | Reported as a warning; `queries` next to the executable is used |
 | No `.sql` files found | Only "Enter query directly" (option 0) is shown; direct input is still available |

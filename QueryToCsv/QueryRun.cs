@@ -47,9 +47,15 @@ internal static class QueryRun
         OutputFile.DeleteLeftovers(OutputFile.StagingDirectory, settings.OutputFolder, DateTime.UtcNow);
         logger.Info("Settings loaded");
 
-        string? settingsError = settings.ValidationError();
-        if (settingsError is not null)
-            return RuntimeError(logger, settingsError);
+        (string? connectionsError, IReadOnlyList<string> connectionWarnings) = settings.ValidateConnections();
+        if (connectionsError is not null)
+            return RuntimeError(logger, connectionsError);
+
+        foreach (string warning in connectionWarnings)
+        {
+            ConsoleMessages.Write(warning);
+            logger.Warn(warning);
+        }
 
         try
         {
