@@ -51,7 +51,7 @@ public class AppSettings
 
     // Returns the settings to run on, plus one notice per configured value that was
     // rejected. A missing or unreadable file is itself a notice, never a failure
-    // (docs/rules/standard.md, Configuration Values).
+    // (docs/rules/configuration.md, Configuration Values).
     public static (AppSettings Settings, IReadOnlyList<string> Notices) Load()
     {
         var baseDirectory = AppContext.BaseDirectory;

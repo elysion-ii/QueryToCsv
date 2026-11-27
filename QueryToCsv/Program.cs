@@ -3,7 +3,7 @@ using System.Text;
 using NLog;
 using QueryToCsv;
 
-// Native SNI.dll is not published (see docs/rules/dotnet.md, NATIVEDEP), so SqlClient
+// Native SNI.dll is not published (see docs/rules/dotnet-client.md, NATIVEDEP), so SqlClient
 // must be switched to its managed networking stack before it opens its first connection.
 const string ManagedNetworkingSwitch = "Switch.Microsoft.Data.SqlClient.UseManagedNetworkingOnWindows";
 AppContext.SetSwitch(ManagedNetworkingSwitch, true);

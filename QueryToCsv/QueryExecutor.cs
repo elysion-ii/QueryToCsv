@@ -55,7 +55,7 @@ public static partial class QueryExecutor
             Logger.Info($"CSV written: {outputPath} ({rowCount} rows)");
 
             // The written file and its row count are what the run produces; the hints
-            // below are not (docs/rules/cli.md, STREAMS).
+            // below are not (docs/rules/cli.md, Standard Streams).
             Console.Error.WriteLine();
             Console.WriteLine($"Done: {outputPath}");
             Console.WriteLine($"Rows: {rowCount.ToString("N0", CultureInfo.InvariantCulture)}");

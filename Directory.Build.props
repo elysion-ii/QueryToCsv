@@ -35,7 +35,7 @@
 
   <!-- The packaging step ships the whole publish directory, and DebugType=none covers
        only this build's own symbols — a native package carries its own beside its
-       library (see docs/rules/dotnet.md, NATIVEDEP). -->
+       library (see docs/rules/dotnet-client.md, NATIVEDEP). -->
   <Target Name="RemoveSymbolsFromPublish"
           AfterTargets="ComputeResolvedFilesToPublishList">
     <ItemGroup>
@@ -47,10 +47,10 @@
   <!-- A single file that unpacks itself at run time is prohibited: it writes a
        per-build directory under the temp folder that nothing ever deletes. Both
        the project and a framework can turn this on, so the guard checks the
-       resolved values (see docs/rules/dotnet.md, NATIVEDEP). -->
+       resolved values (see docs/rules/dotnet-client.md, NATIVEDEP). -->
   <Target Name="ForbidSelfExtractingPublish"
           BeforeTargets="GenerateSingleFileBundle"
           Condition="'$(IncludeNativeLibrariesForSelfExtract)' == 'true' Or '$(IncludeAllContentForSelfExtract)' == 'true'">
-    <Error Text="This single-file publish would unpack itself into the temp folder on every new build, and nothing deletes what it leaves there. IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract), IncludeAllContentForSelfExtract=$(IncludeAllContentForSelfExtract). Remove whichever the project sets; where a framework sets it (WinUI 3 does), stop publishing that project as a single file (see docs/rules/dotnet.md, NATIVEDEP)." />
+    <Error Text="This single-file publish would unpack itself into the temp folder on every new build, and nothing deletes what it leaves there. IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract), IncludeAllContentForSelfExtract=$(IncludeAllContentForSelfExtract). Remove whichever the project sets; where a framework sets it (WinUI 3 does), stop publishing that project as a single file (see docs/rules/dotnet-client.md, NATIVEDEP)." />
   </Target>
 </Project>

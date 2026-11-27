@@ -38,7 +38,7 @@ Name: "addtopath"; Description: "Add to PATH environment variable"; GroupDescrip
 
 [Files]
 ; Ship the whole publish output, not just the executable: a native dependency
-; adds files beside it (see docs/rules/dotnet.md, NATIVEDEP). The runtime folders are
+; adds files beside it (see docs/rules/dotnet-client.md, NATIVEDEP). The runtime folders are
 ; excluded because running the app from the build output fills them with local data;
 ; [Dirs] below creates them empty at the install target.
 Source: "QueryToCsv\*"; Excludes: "appsettings.json,logs\*,queries\*,output\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

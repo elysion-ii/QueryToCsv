@@ -51,7 +51,7 @@ internal static class LogSetup
     // NLog's own MaxArchiveDays deletes nothing when the date lives in FileName instead
     // of an archive pattern (measured: QueryToCsv_20250101.log survived a run with
     // MaxArchiveDays=30), so the retention limit is applied here
-    // (docs/rules/dotnet.md, LOGGING).
+    // (docs/rules/client.md, Logs on the Host Machine).
     internal static void DeleteExpiredLogs(string directory, int retentionDays, DateTime now)
     {
         if (!Directory.Exists(directory))
@@ -79,7 +79,7 @@ internal static class LogSetup
     }
 
     // The directory beside the executable is not writable in every installation, and a
-    // run that cannot log still has to run (docs/rules/dotnet.md, LOGGING).
+    // run that cannot log still has to run (docs/specs/QueryToCsv.md, QueryToCsv-011).
     internal static string ResolveDirectory(string preferred, string fallback)
         => IsWritable(preferred) ? preferred : fallback;
 
