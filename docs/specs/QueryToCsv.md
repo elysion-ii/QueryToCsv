@@ -40,7 +40,8 @@ Projects: `QueryToCsv` (the application), `QueryToCsv.Tests` (unit and boundary 
   configuration file, the `.sql` files, and the credentials stored for the operator's
   Windows account.
 - **Microsoft SQL Server**: the only external system. Reached over an encrypted connection
-  whose server certificate is validated, using Windows authentication or SQL Server
+  whose server certificate is validated unless the operator sets
+  `TrustServerCertificate` (QTC-7), using Windows authentication or SQL Server
   authentication with credentials held in Windows Credential Manager (QTC-8).
 - **The local file system**: `.sql` inputs, CSV outputs, log files, the configuration
   file, and the temporary folder.
@@ -163,15 +164,35 @@ below — on standard error and in the log, and exits 1 before connecting.
 | `Name` equal to an earlier entry's, ignoring case | `Connections[<index>].Name "<name>" is already used by Connections[<earlier index>].` |
 | `ConnectionString` missing or blank | `Connections[<index>].ConnectionString is required.` |
 | `ConnectionString` not parseable as a SQL Server connection string | `Connections[<index>].ConnectionString is not a valid connection string.` |
-| `ConnectionString` sets `TrustServerCertificate` to true | `Connections[<index>].ConnectionString must not set TrustServerCertificate; give the server a certificate the client trusts, or pin it with "Server Certificate".` |
 | `ConnectionString` sets `Encrypt` to `False`, `No`, or `Optional` | `Connections[<index>].ConnectionString must not turn encryption off.` |
 | `ConnectionString` contains `Password` or `PWD` | `Connections[<index>].ConnectionString must not contain a password; store it in Windows Credential Manager and name it in Connections[<index>].Credential.` |
 | `ConnectionString` contains `User ID` or `UID` | `Connections[<index>].ConnectionString must not contain a user name; it comes from Connections[<index>].Credential.` |
 | `Credential` present but blank | `Connections[<index>].Credential is blank.` |
 
-The certificate and password checks exist because a connection that accepts any
-certificate can be intercepted, and a password in a plain-text file can be read by anyone
-who can read the installation folder (`docs/rules/db.md`, `docs/rules/security.md`).
+The encryption and password checks exist because an unencrypted connection can be read
+on the way, and a password in a plain-text file can be read by anyone who can read the
+installation folder (`docs/rules/db.md`, `docs/rules/security.md`).
+
+**Insecure certificate setting.** An entry whose `ConnectionString` sets
+`TrustServerCertificate` to true is accepted and connects as configured, even though the
+setting lets the connection accept a server certificate nobody validated, which allows it
+to be intercepted. When the connections are usable, a run mode reports one warning per
+such entry, in array order, on standard error and in the log at warning level, before
+choosing the connection:
+
+`QueryToCsv: Connections[<index>] "<name>" contains an insecure setting: TrustServerCertificate=True accepts any server certificate, so the connection can be intercepted. Give the server a certificate the client trusts, or pin it with "Server Certificate".`
+
+- The warning changes no exit code and is not an error (QTC-13).
+- A run that ends on a problem in the table above reports only that problem, because it
+  connects nowhere.
+- The warning follows from `TrustServerCertificate` alone, whatever `Encrypt` is set to
+  (`docs/rules/QueryToCsv.md`, Server Certificate Validation).
+- Help, version, and open modes do not validate the connections and report nothing.
+- The warning names the entry; it never contains the connection string.
+
+The operator decides whether to accept this risk, because a server that uses its
+self-generated certificate cannot be given a validated connection without reconfiguring
+the server (`docs/rules/QueryToCsv.md`, Server Certificate Validation).
 
 ### QTC-8: Credentials for SQL Server authentication
 
@@ -279,7 +300,8 @@ this order:
 1. Command-line syntax (QTC-1, QTC-4, QTC-9) — usage error
 2. The `-e` encoding name (QTC-10) — usage error, reported before configuration is read
 3. Rejected preference values (QTC-6) — reported, never an error
-4. Connections (QTC-7) — runtime error
+4. Connections (QTC-7) — runtime error; then the insecure-certificate warnings (QTC-7) —
+   reported, never an error
 5. The `-c` connection choice (QTC-11) — usage error
 6. The `-f` path outside `QueryFolder` (QTC-9) — usage error
 7. In this order: the `-f` file and the SQL text (QTC-9, QTC-14), the SELECT-only check
@@ -476,7 +498,8 @@ report go to standard error.
   (`2026-03-02T15:30:45.123+09:00`), so entries from machines in different time zones
   compare correctly.
 - Entries are in English and record: the start with the version; every rejected
-  configuration value; the selected connection by name; the query as the `.sql` file
+  configuration value; every insecure-certificate warning (QTC-7); the selected
+  connection by name; the query as the `.sql` file
   name, `[Inline]` for `--query`, or `[Direct Input]`; the header choice and encoding;
   the written file and its row count; every error of QTC-13 and its cause; and the end
   with its exit code.

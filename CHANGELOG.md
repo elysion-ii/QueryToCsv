@@ -9,6 +9,14 @@ to build an installer for a version that has no heading here.
 
 ## [Unreleased]
 
+### Changed
+
+- A connection string that sets `TrustServerCertificate=True` is accepted again instead
+  of ending the run, for servers that use SQL Server's self-generated certificate. Every
+  run that connects warns about each such entry on standard error and in the log, without
+  printing the connection string; the exit code is unchanged. Turning encryption off and
+  putting a user name or password in the connection string are still rejected.
+
 ## [4.0.0] - 2026-11-27
 
 ### Changed

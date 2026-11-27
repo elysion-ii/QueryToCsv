@@ -10,9 +10,10 @@ namespace QueryToCsv.TestSupport;
 
 // One SQL Server for the test run, started in Docker and removed when the run ends. The
 // server presents a certificate created here, and clients trust exactly that certificate
-// ("Server Certificate"), the way an operator pins a server certificate: no test needs
-// TrustServerCertificate, which the application rejects (docs/specs/QueryToCsv.md, QTC-7).
-// Tests query literal values only, so the server needs no schema.
+// ("Server Certificate"), the way an operator pins a server certificate. Only the test of
+// the insecure-certificate warning connects with TrustServerCertificate instead
+// (docs/specs/QueryToCsv.md, QTC-7). Tests query literal values only, so the server needs
+// no schema.
 public sealed class SqlServerFixture : IAsyncLifetime
 {
     // Pinned by digest so every run tests against the same server build (16.0.4325.4).
@@ -39,6 +40,16 @@ public sealed class SqlServerFixture : IAsyncLifetime
         InitialCatalog = "master",
         Encrypt = SqlConnectionEncryptOption.Mandatory,
         ServerCertificate = CertificatePath,
+    }.ConnectionString;
+
+    // Encrypted but accepting any server certificate, without credentials: the form an
+    // operator writes for a server that uses its self-generated certificate.
+    public string ConnectionStringTrustingAnyCertificate => new SqlConnectionStringBuilder
+    {
+        DataSource = Server,
+        InitialCatalog = "master",
+        Encrypt = SqlConnectionEncryptOption.Mandatory,
+        TrustServerCertificate = true,
     }.ConnectionString;
 
     public string ConnectionString => new SqlConnectionStringBuilder(ConnectionStringWithoutCredentials)
