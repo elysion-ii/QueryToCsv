@@ -9,7 +9,7 @@ Feature folders and homes of cross-cutting mechanisms in QueryToCsv (`docs/rules
 
 | Path | Knowledge |
 |---|---|
-| `QueryToCsv/` | The whole application in one flat folder: exporting a SQL Server result set to CSV. `Program.cs` is the entry point that selects the CLI mode (help, version, `--open`, one-liner, interactive), wires Ctrl+C to cancellation, and records the run's start and end |
+| `QueryToCsv/` | The whole application in one flat folder: exporting a SQL Server result set to CSV. `Program.cs` is the entry point that selects the CLI mode (help, version, `--guide`, `--open`, one-liner, interactive), wires Ctrl+C to cancellation, and records the run's start and end |
 | `QueryToCsv/CliInvocation.cs`, `QueryToCsv/CliMode.cs`, `QueryToCsv/CliRunArgs.cs` | Command-line parsing: top-level mode selection and `--open` targets, and the one-liner options |
 | `QueryToCsv/QueryRun.cs` | The interactive and one-liner runs: connection and query selection, `-f` path containment, credential resolution, and the one place a failure that ends a run is reported on standard error and recorded in the log |
 | `QueryToCsv/RunFailureException.cs` | A failure the operator can act on, thrown where it is detected and reported by `QueryRun` |
@@ -18,6 +18,7 @@ Feature folders and homes of cross-cutting mechanisms in QueryToCsv (`docs/rules
 | `QueryToCsv/appsettings.template.json` | The configuration contract: every setting the application reads, with placeholder values; the build ships it as the initial `appsettings.json` |
 | `QueryToCsv/LogSetup.cs` | Logging: NLog configuration, log-directory selection with its fallback, and the retention sweep |
 | `QueryToCsv/ConsoleMessages.cs` | Diagnostics on standard error in the `QueryToCsv: <message>` form, including the `--help` hint after a usage error |
+| `QueryToCsv/UsageGuide.cs`, `docs/guides/usage.md` | The usage guide: the operator documentation, embedded in the executable by `QueryToCsv.csproj` and printed by `--guide` without its front matter |
 | `QueryToCsv/ApplicationVersion.cs` | The application name and the version display text |
 | `QueryToCsv/ConsoleUi.cs` | CSV encoding-name resolution (strict encodings) shared by the one-liner and interactive modes, and the interactive prompts |
 | `QueryToCsv/SqlText.cs` | Reading SQL text: size limits, byte order marks, and strict decoding of `.sql` files |

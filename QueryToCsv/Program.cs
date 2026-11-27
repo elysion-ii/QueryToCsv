@@ -26,6 +26,9 @@ switch (invocation!.Mode)
     case CliMode.Version:
         Console.WriteLine(ApplicationVersion.DisplayText);
         return 0;
+    case CliMode.Guide:
+        await Console.Out.WriteAsync(await UsageGuide.ReadAsync());
+        return 0;
     case CliMode.Open:
         return HandleOpen(invocation.OpenTarget!);
 }
@@ -83,7 +86,7 @@ static int PrintHelp()
     Console.WriteLine("  QueryToCsv --query <sql> [options]");
     Console.WriteLine("  QueryToCsv --file <file> [options]");
     Console.WriteLine("  QueryToCsv --open <target>");
-    Console.WriteLine("  QueryToCsv [--help | --version]");
+    Console.WriteLine("  QueryToCsv [--help | --version | --guide]");
     Console.WriteLine();
     Console.WriteLine("Options:");
     Console.WriteLine("  -c, --connection <name>   Connection name from appsettings.json");
@@ -96,6 +99,8 @@ static int PrintHelp()
     Console.WriteLine("      --no-header           Exclude header row");
     Console.WriteLine("  -h, --help                Show this help");
     Console.WriteLine("  -V, --version             Show version");
+    Console.WriteLine("      --guide               Print the full usage guide: configuration,");
+    Console.WriteLine("                            CSV format, logs, errors");
     Console.WriteLine();
     Console.WriteLine("Open targets:");
     Console.WriteLine("  queries       Open the queries folder in Explorer");

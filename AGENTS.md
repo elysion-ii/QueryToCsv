@@ -105,6 +105,7 @@ in this repository) first; it defines placement, naming, and front matter.
 - `docs/references/code-map.md` — feature folders and shared mechanism homes
 - `docs/references/QueryToCsv/` — behavior ledgers (`unconfirmed-behavior.md`, `violating-behavior.md`) when the specification defers any behavior; none exists now
 - `docs/notes/` — deferred code and documentation violations when any are deferred; none exists now
+- `docs/guides/usage.md` — the operator usage guide; the build embeds it in the executable, which prints it with `--guide`; what the printed text must satisfy is QTC-29 in `docs/specs/QueryToCsv.md`
 - `docs/guides/release.md` — the release procedure
 - `docs/adr/` — Architecture Decision Records; retired ADRs move to `docs/adr/archive/`
 - `docs/plans/` and `docs/archive/plans/` — working area for plans, gitignored (`docs/rules/documentation.md`, Category Notes — `docs/plans/`)

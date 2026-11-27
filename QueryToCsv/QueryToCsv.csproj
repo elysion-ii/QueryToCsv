@@ -32,6 +32,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The usage guide the guide mode prints; LogicalName is the name UsageGuide.cs
+         reads (docs/specs/QueryToCsv.md, QTC-29) -->
+    <EmbeddedResource Include="..\docs\guides\usage.md" LogicalName="QueryToCsv.usage.md" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="QueryToCsv.Tests" />
   </ItemGroup>
 
