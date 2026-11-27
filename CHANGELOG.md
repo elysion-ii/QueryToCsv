@@ -9,6 +9,8 @@ to build an installer for a version that has no heading here.
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-11-27
+
 ### Added
 
 - `QueryToCsv --guide` prints the usage guide to standard output: configuration,
