@@ -4,13 +4,13 @@ using Microsoft.Extensions.Configuration;
 
 namespace QueryToCsv;
 
-public class ConnectionEntry
+internal class ConnectionEntry
 {
     public string Name { get; set; } = "";
     public string ConnectionString { get; set; } = "";
 }
 
-public class CsvSettings
+internal class CsvSettings
 {
     public const string DefaultDelimiter = ",";
     public const string DefaultNullValue = "";
@@ -22,7 +22,7 @@ public class CsvSettings
     public string? DateFormat { get; set; }
 }
 
-public class AppSettings
+internal class AppSettings
 {
     public const string FileName = "appsettings.json";
     public const string DefaultQueryFolderName = "queries";

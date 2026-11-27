@@ -65,6 +65,41 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+# Every requirement a specification states is named by a test, and no test names a
+# requirement no specification states
+# (rules: docs/rules/testing.md, Requirement Coverage; docs/rules/dotnet.md, REQCOV)
+Write-Host "Verifying requirement coverage..." -ForegroundColor Cyan
+# IDs compare exactly, case included (docs/rules/documentation.md, Requirement IDs)
+$RequirementHeading = '(?m)^\s*#{1,6}\s+([A-Z][A-Z0-9]*-\d+):'
+$RequirementIds = @()
+if (Test-Path "docs\specs") {
+    # An HTML comment is not part of the specification (e.g., the skeleton's example heading)
+    $RequirementIds = @(Get-ChildItem "docs\specs" -Recurse -Filter *.md |
+        ForEach-Object { [regex]::Replace([System.IO.File]::ReadAllText($_.FullName), '(?s)<!--.*?-->', '') } |
+        ForEach-Object { [regex]::Matches($_, $RequirementHeading) } |
+        ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
+}
+$TestSource = (Get-ChildItem -Directory | Where-Object { $_.Name -like "*Tests" } |
+    Get-ChildItem -Recurse -Filter *.cs | Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' } |
+    ForEach-Object { [System.IO.File]::ReadAllText($_.FullName) }) -join "`n"
+$Unnamed = @($RequirementIds | Where-Object {
+    $TestSource -cnotmatch ('(?<![A-Za-z0-9])' + [regex]::Escape($_) + '(?![0-9])')
+})
+$TraitIds = @([regex]::Matches($TestSource, 'Trait\(\s*"Requirement"\s*,\s*"([^"]*)"\s*\)') |
+    ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
+$Missing = @($TraitIds | Where-Object { $RequirementIds -cnotcontains $_ })
+if ($Unnamed.Count -gt 0 -or $Missing.Count -gt 0) {
+    if ($Unnamed.Count -gt 0) {
+        Write-Host "   [ERROR] No test names these requirements: $($Unnamed -join ', ')" -ForegroundColor Red
+    }
+    if ($Missing.Count -gt 0) {
+        Write-Host "   [ERROR] Tests name requirements no specification states: $($Missing -join ', ')" -ForegroundColor Red
+    }
+    Write-Host "           See docs/rules/dotnet.md, REQCOV" -ForegroundColor Red
+    Write-Host "`n=== Build Failed ===" -ForegroundColor Red
+    exit 1
+}
+
 Write-Host "Running QueryToCsv tests..." -ForegroundColor Cyan
 dotnet test QueryToCsv.Tests\QueryToCsv.Tests.csproj -c $Configuration
 if ($LASTEXITCODE -ne 0) {

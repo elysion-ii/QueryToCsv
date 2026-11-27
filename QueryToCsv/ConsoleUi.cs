@@ -3,7 +3,7 @@ using Microsoft.Data.SqlClient;
 
 namespace QueryToCsv;
 
-public static class ConsoleUi
+internal static class ConsoleUi
 {
     public static int SelectQuery(string[] fileNames)
     {

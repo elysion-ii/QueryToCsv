@@ -8,7 +8,7 @@ using NLog;
 
 namespace QueryToCsv;
 
-public static partial class QueryExecutor
+internal static partial class QueryExecutor
 {
     private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 

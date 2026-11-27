@@ -241,10 +241,9 @@ begin
 
     if UninstallSilent then
     begin
-      // No dialog can be shown. Unattended deployment is what runs a silent
-      // uninstall, and stopping here would fail that deployment with nothing on
-      // screen to explain it, so the application is closed and the uninstall
-      // continues.
+      // No dialog can be shown. Silent uninstall requests a graceful close via
+      // Restart Manager (never force-closing) and returns False (exiting non-zero)
+      // if processes remain open (docs/rules/client.md).
       Result := CloseRunningProcesses;
       Exit;
     end;

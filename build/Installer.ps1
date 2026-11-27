@@ -45,7 +45,7 @@ $IsccPath = Resolve-IsccPath
 if (-not $IsccPath) {
     Write-Host "   [ERROR] Inno Setup not found" -ForegroundColor Red
     Write-Host "   Searched the uninstall registry, PATH, the .iss file association, and the default install locations" -ForegroundColor Yellow
-    Write-Host "   Install Inno Setup 6 or later from https://jrsoftware.org/isdl.php" -ForegroundColor Yellow
+    Write-Host "   Install Inno Setup 6.3 or later from https://jrsoftware.org/isdl.php" -ForegroundColor Yellow
     exit 1
 }
 Write-Host "Inno Setup: $IsccPath" -ForegroundColor Cyan

@@ -33,6 +33,13 @@
     <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.*" PrivateAssets="all" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- BannedSymbols.txt lists the APIs no code may call; every use is RS0030, a
+         build error (see docs/rules/dotnet.md, ANALYZERS). -->
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.*" PrivateAssets="all" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
+  </ItemGroup>
+
   <!-- The packaging step ships the whole publish directory, and DebugType=none covers
        only this build's own symbols — a native package carries its own beside its
        library (see docs/rules/dotnet-client.md, NATIVEDEP). -->
