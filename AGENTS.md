@@ -36,7 +36,7 @@ Rules in `docs/rules/` are organized into three tiers:
 **Precedence on conflict**: Application rules > Stack rules > Shared rules.
 
 - **Rule Scope**: which rule files and specification every change complies with — and when to report missing conditional shared rule domains — is stated in `docs/rules/standard.md` (How to Use These Rules). The specification of QueryToCsv is `docs/specs/QueryToCsv.md`.
-- **Loading Rules**: Read this file, every applicable file under `docs/rules/`, `docs/specs/QueryToCsv.md`, and `docs/references/code-map.md` before writing code (including when transitioning from a plan to implementation).
+- **Loading Rules**: Read this file, every applicable file under `docs/rules/`, `docs/specs/QueryToCsv.md` with its ledger `docs/references/QueryToCsv/violating-behavior.md`, `docs/references/code-map.md`, and the deferred violations in `docs/notes/QueryToCsv/deferred-violations.md` before writing code (including when transitioning from a plan to implementation).
 - **Completion Gate (AUDIT)**: Before reporting an implementation task as complete, pass the AUDIT gate in `docs/rules/standard.md`.
 - **File Ownership**: rule files under `docs/rules/` managed by dev-standards are copies of its pinned tag; repository- and application-specific rules are maintained in `docs/rules/QueryToCsv.md`.
 
@@ -92,6 +92,8 @@ in this repository) first; it defines placement, naming, and front matter.
 - `docs/rules/` — rule bodies: universal shared rules (`docs/rules/standard.md`, `docs/rules/documentation.md`, `docs/rules/specs.md`, `docs/rules/testing.md`), `docs/rules/dotnet.md`, the conditional shared and .NET facet rule files distributed to this repository (all managed by dev-standards), and `docs/rules/QueryToCsv.md` (application rules)
 - `docs/specs/QueryToCsv.md` — the QueryToCsv specification: what it does
 - `docs/references/code-map.md` — feature folders and shared mechanism homes
+- `docs/references/QueryToCsv/violating-behavior.md` — implementation behavior that breaks a rule, deferred and kept out of the specification
+- `docs/notes/QueryToCsv/deferred-violations.md` — code and documentation violations whose fix is deferred
 - `docs/guides/release.md` — the release procedure
 - `docs/adr/` — Architecture Decision Records; retired ADRs move to `docs/adr/archive/`
 - `docs/plans/` and `docs/archive/plans/` — working area for plans, gitignored (`docs/rules/documentation.md`, Category Notes — `docs/plans/`)

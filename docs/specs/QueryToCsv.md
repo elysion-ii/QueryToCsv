@@ -92,7 +92,7 @@ Every other setting falls back to its built-in default when its value is unusabl
 | `CsvSettings.Delimiter` | `,` | Not exactly one character |
 | `CsvSettings.NullValue` | An empty field | Never — every string is usable |
 | `CsvSettings.NewLine` | `CRLF` | Not `CRLF` or `LF`, which are case-sensitive |
-| `CsvSettings.DateFormat` | Absent, so dates use the invariant-culture default | Not a usable date format string |
+| `CsvSettings.DateFormat` | Absent (no format set) | Not a usable date format string |
 
 ### QueryToCsv-004: Interactive run
 
@@ -193,7 +193,7 @@ file is never overwritten.
 - RFC 4180 quoting: a field containing the delimiter, a line break, or a double quote is
   enclosed in double quotes, and inner double quotes are doubled.
 - `NULL` is written as `CsvSettings.NullValue`.
-- Dates use `CsvSettings.DateFormat` when set, otherwise the invariant-culture default.
+- Dates use `CsvSettings.DateFormat` when set.
 - Numbers use invariant culture: `.` as the decimal point, no thousands separator.
 - The delimiter and line terminator come from `CsvSettings`; the file is written in the
   selected encoding, with a BOM only for UTF-8 with BOM and UTF-16 LE.
@@ -300,9 +300,8 @@ run continues on the default:
   upgrade is finished.
 - An uninstall performed while QueryToCsv is running offers three answers: close it and
   continue, re-check after the user has closed it by hand, or cancel and leave the
-  application installed. Nothing is closed forcibly. An unattended uninstall closes the
-  application and continues, and an uninstall whose detection cannot run proceeds
-  regardless.
+  application installed. Nothing is closed forcibly, and an uninstall whose detection
+  cannot run proceeds regardless.
 
 ## Out of Scope
 
