@@ -2,7 +2,11 @@
 
 param(
     [string]$Configuration = "Release",
-    [string]$Runtime = "win-x64"
+    [string]$Runtime = "win-x64",
+    # Boundary tests need Docker for their SQL Server. Pass this only where an earlier
+    # step already ran them on the same commit (the release workflow does so on Linux,
+    # because Windows runners cannot start Linux containers); every other build runs them.
+    [switch]$SkipBoundaryTests
 )
 
 # Build folder is the current location, solution root is parent
@@ -96,8 +100,13 @@ if ($Unnamed.Count -gt 0 -or $Missing.Count -gt 0) {
     exit 1
 }
 
-Write-Host "Running QueryToCsv tests..." -ForegroundColor Cyan
-dotnet test QueryToCsv.Tests\QueryToCsv.Tests.csproj -c $Configuration
+Write-Host "Running QueryToCsv unit and boundary tests..." -ForegroundColor Cyan
+$TestArgs = @("QueryToCsv.Tests\QueryToCsv.Tests.csproj", "-c", $Configuration)
+if ($SkipBoundaryTests) {
+    Write-Host "   Boundary tests skipped: run by an earlier step on this commit" -ForegroundColor Yellow
+    $TestArgs += @("--filter", "Category!=Boundary")
+}
+dotnet test @TestArgs
 if ($LASTEXITCODE -ne 0) {
     Write-Host "   [ERROR] Tests failed - build aborted" -ForegroundColor Red
     if (Test-Path $PublishDir) { Remove-Item $PublishDir -Recurse -Force }
