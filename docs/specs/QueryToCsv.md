@@ -323,7 +323,6 @@ run continues on the default:
 | QueryToCsv-007 | `QueryExecutorTests.IsSelectOnly_Statement_MatchesExpectation` |
 | QueryToCsv-009 | `QueryExecutorTests.BuildOutputPath_*` |
 | QueryToCsv-010 (encoding selection) | `ConsoleUiTests` |
-
 | QueryToCsv-011 (log directory fallback) | `LogSetupTests` |
 
 QueryToCsv-001 behavior after mode selection, -004, -006, -008, the log content side of

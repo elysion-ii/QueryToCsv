@@ -33,7 +33,7 @@ Pre-built binaries are available on the [Releases](https://github.com/elysion-ii
 
 ### 1. Build (from source)
 
-Run `build/Menu.bat` and select **Build** from the menu. This produces a self-contained executable in `build/QueryToCsv/`. The build runs a configuration-file check, a code format check, and the test suite first, and stops if any of them fails.
+Run `build/Menu.bat` and select **Build** from the menu. This produces a self-contained executable in `build/QueryToCsv/`. The build runs a configuration-file check, a code format check, a requirement-coverage check, and the test suite first, and stops if any of them fails.
 
 ### 2. Configure
 
@@ -341,7 +341,7 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ## Building the Installer
 
-Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php).
+Requires [Inno Setup 6.3 or later](https://jrsoftware.org/isinfo.php).
 
 1. Run `build/Menu.bat`
 2. Select **Full Build**

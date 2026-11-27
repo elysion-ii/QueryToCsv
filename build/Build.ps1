@@ -15,7 +15,6 @@ $OutputDir = Join-Path $BuildDir "QueryToCsv"
 $PublishDir = Join-Path $BuildDir "publish_temp"
 $ProjectPath = "QueryToCsv\QueryToCsv.csproj"
 
-# Check dotnet CLI is available
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     Write-Host "   [ERROR] dotnet CLI not found. Please install .NET SDK." -ForegroundColor Red
     exit 1
@@ -28,12 +27,9 @@ if (-not (Test-Path $ProjectPath)) {
     exit 1
 }
 
-# Cleanup temp folder
 if (Test-Path $PublishDir) { Remove-Item $PublishDir -Recurse -Force }
-# Clean existing output folder
 if (Test-Path $OutputDir) { Remove-Item $OutputDir -Recurse -Force }
 
-# Create output folder
 New-Item -ItemType Directory -Path $OutputDir -Force -ErrorAction SilentlyContinue | Out-Null
 
 # Only the placeholder template of a configuration file belongs in the repository:
