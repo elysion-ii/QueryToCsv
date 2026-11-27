@@ -1,3 +1,4 @@
+using System.Text;
 using Xunit;
 
 namespace QueryToCsv.Tests;
@@ -23,9 +24,9 @@ public class ConsoleUiTests
 
     [Theory]
     [MemberData(nameof(KnownEncodings))]
-    public void ResolveEncoding_KnownName_ReturnsMatchingEncoding(string name, int expectedCodePage, bool expectsBom)
+    internal void ResolveEncoding_KnownName_ReturnsMatchingEncoding(string name, int expectedCodePage, bool expectsBom)
     {
-        var encoding = ConsoleUi.ResolveEncoding(name);
+        Encoding? encoding = ConsoleUi.ResolveEncoding(name);
 
         Assert.NotNull(encoding);
         Assert.Equal(expectedCodePage, encoding.CodePage);
@@ -40,15 +41,15 @@ public class ConsoleUiTests
     [InlineData("euc-jp")]
     [InlineData("cp932")]
     [InlineData("ascii")]
-    public void ResolveEncoding_UnknownName_ReturnsNull(string name)
+    internal void ResolveEncoding_UnknownName_ReturnsNull(string name)
     {
         Assert.Null(ConsoleUi.ResolveEncoding(name));
     }
 
     [Fact]
-    public void ResolveEncoding_ShiftJis_RoundTripsJapaneseText()
+    internal void ResolveEncoding_ShiftJis_RoundTripsJapaneseText()
     {
-        var encoding = ConsoleUi.ResolveEncoding("shift-jis");
+        Encoding? encoding = ConsoleUi.ResolveEncoding("shift-jis");
 
         Assert.NotNull(encoding);
         Assert.Equal("売上", encoding.GetString(encoding.GetBytes("売上")));

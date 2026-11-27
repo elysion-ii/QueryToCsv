@@ -151,14 +151,27 @@ exits 1. Omitting the value after `--open` is a usage error and exits 2.
 
 ### QueryToCsv-007: SELECT-only enforcement
 
-Before anything reaches the server, comments and string literals are removed from the
-statement text and the remainder is scanned for data-modifying and out-of-scope keywords
-(`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `TRUNCATE`, `EXEC`, `EXECUTE`,
-`MERGE`, `GRANT`, `REVOKE`, `DENY`, `BULK`, `INTO`, `OPENROWSET`, `OPENDATASOURCE`,
-`OPENQUERY`). A match rejects the statement with exit code 1 and nothing is sent.
+Before anything reaches the server, the statement text is parsed as T-SQL. It is
+accepted only when all of the following hold:
 
-Matching is on whole words, so identifiers that merely contain a keyword (`CreateDate`,
-`UpdateLog`) remain usable.
+- It parses without a syntax error.
+- It holds exactly one batch, and that batch holds exactly one statement. A trailing
+  semicolon is allowed.
+- That statement is a `SELECT`, optionally preceded by `WITH` common table expressions.
+- The `SELECT` has no `INTO` clause.
+- Nothing in it reads an external rowset source: `OPENROWSET` (including
+  `OPENROWSET(BULK ...)`), `OPENQUERY`, or `OPENDATASOURCE`.
+
+Anything else is rejected with exit code 1, and nothing is sent. That includes empty
+text, a second statement in the same batch (with or without a separating semicolon), a
+second batch after `GO`, and a batch that starts with a bare procedure name, which SQL
+Server would otherwise execute without `EXEC`. Each such statement is a way for text
+that begins with a `SELECT` to reach the server with another effect.
+
+The decision is made on the parsed statement, never on the words in the text. Comments
+and string literals therefore never change it, and identifiers that look like keywords
+stay usable, whether they contain a keyword (`CreateDate`, `UpdateLog`) or are a
+bracketed keyword (`[Update]`).
 
 ### QueryToCsv-008: Query execution
 

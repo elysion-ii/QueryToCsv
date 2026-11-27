@@ -30,16 +30,19 @@ public class CliRunArgsTests
     // args -> connection, inline query, sql file, encoding, include header
     public static TheoryData<string[], string?, string?, string?, string, bool> AcceptedArgs() => new()
     {
-        { ["--query", "SELECT * FROM Users"], null, "SELECT * FROM Users", null, "utf-8", true },
-        { ["-f", "sales_report.sql"], null, null, "sales_report.sql", "utf-8", true },
+        // One query source, everything else defaulted
         { ["--query", "SELECT 1"], null, "SELECT 1", null, "utf-8", true },
         { ["--query=SELECT 1"], null, "SELECT 1", null, "utf-8", true },
         { ["--file", "a.sql"], null, null, "a.sql", "utf-8", true },
         { ["--file=a.sql"], null, null, "a.sql", "utf-8", true },
+        { ["-f", "sales_report.sql"], null, null, "sales_report.sql", "utf-8", true },
+        { ["--query", "SELECT * FROM Users"], null, "SELECT * FROM Users", null, "utf-8", true },
+        // Header flags: the last one wins
         { ["--query", "SELECT 1", "--header"], null, "SELECT 1", null, "utf-8", true },
         { ["--query", "SELECT 1", "--no-header"], null, "SELECT 1", null, "utf-8", false },
         { ["--query", "SELECT 1", "--no-header", "--header"], null, "SELECT 1", null, "utf-8", true },
         { ["--query", "SELECT 1", "--header", "--no-header"], null, "SELECT 1", null, "utf-8", false },
+        // Connection and encoding, in every spelling
         { ["-c", "Dev Server", "--query", "SELECT 1"], "Dev Server", "SELECT 1", null, "utf-8", true },
         { ["--connection=Prod", "--file=a.sql", "--encoding=utf-16"], "Prod", null, "a.sql", "utf-16", true },
         { ["--connection", "Prod", "-f", "a.sql", "--encoding", "utf-16"], "Prod", null, "a.sql", "utf-16", true },
@@ -53,9 +56,9 @@ public class CliRunArgsTests
 
     [Theory]
     [MemberData(nameof(RejectedArgs))]
-    public void Parse_InvalidArgs_ReturnsExpectedError(string[] args, string expectedError)
+    internal void Parse_InvalidArgs_ReturnsExpectedError(string[] args, string expectedError)
     {
-        var (runArgs, error) = CliRunArgs.Parse(args);
+        (CliRunArgs? runArgs, string? error) = CliRunArgs.Parse(args);
 
         Assert.Null(runArgs);
         Assert.Equal(expectedError, error);
@@ -63,7 +66,7 @@ public class CliRunArgsTests
 
     [Theory]
     [MemberData(nameof(AcceptedArgs))]
-    public void Parse_ValidArgs_ReturnsExpectedRunArgs(
+    internal void Parse_ValidArgs_ReturnsExpectedRunArgs(
         string[] args,
         string? expectedConnection,
         string? expectedInlineQuery,
@@ -71,7 +74,7 @@ public class CliRunArgsTests
         string expectedEncoding,
         bool expectedIncludeHeader)
     {
-        var (runArgs, error) = CliRunArgs.Parse(args);
+        (CliRunArgs? runArgs, string? error) = CliRunArgs.Parse(args);
 
         Assert.Null(error);
         Assert.NotNull(runArgs);

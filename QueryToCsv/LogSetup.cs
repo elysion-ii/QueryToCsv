@@ -57,15 +57,15 @@ internal static class LogSetup
         if (!Directory.Exists(directory))
             return;
 
-        var oldestKept = now.Date.AddDays(1 - retentionDays);
+        DateTime oldestKept = now.Date.AddDays(1 - retentionDays);
 
         // The listing is materialized before the first delete
         // (docs/rules/standard.md, Snapshot Before Mutate).
-        var expired = Directory.GetFiles(directory, $"{ApplicationVersion.ApplicationName}_*.log")
+        List<string> expired = Directory.GetFiles(directory, $"{ApplicationVersion.ApplicationName}_*.log")
             .Where(path => IsExpired(path, oldestKept))
             .ToList();
 
-        foreach (var path in expired)
+        foreach (string? path in expired)
         {
             try
             {
@@ -85,10 +85,10 @@ internal static class LogSetup
 
     private static bool IsExpired(string path, DateTime oldestKept)
     {
-        var stamp = Path.GetFileNameWithoutExtension(path)[(ApplicationVersion.ApplicationName.Length + 1)..];
+        string stamp = Path.GetFileNameWithoutExtension(path)[(ApplicationVersion.ApplicationName.Length + 1)..];
 
         return DateTime.TryParseExact(
-                   stamp, DateStampFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+                   stamp, DateStampFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date)
                && date < oldestKept;
     }
 
@@ -98,7 +98,7 @@ internal static class LogSetup
         {
             Directory.CreateDirectory(directory);
 
-            var probe = Path.Combine(directory, $"{Guid.NewGuid():N}.probe");
+            string probe = Path.Combine(directory, $"{Guid.NewGuid():N}.probe");
             using (File.Create(probe))
             {
             }

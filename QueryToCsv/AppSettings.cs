@@ -4,32 +4,14 @@ using Microsoft.Extensions.Configuration;
 
 namespace QueryToCsv;
 
-internal class ConnectionEntry
+internal sealed class AppSettings
 {
-    public string Name { get; set; } = "";
-    public string ConnectionString { get; set; } = "";
-}
-
-internal class CsvSettings
-{
-    public const string DefaultDelimiter = ",";
-    public const string DefaultNullValue = "";
-    public const string DefaultNewLine = "CRLF";
-
-    public string Delimiter { get; set; } = DefaultDelimiter;
-    public string NullValue { get; set; } = DefaultNullValue;
-    public string NewLine { get; set; } = DefaultNewLine;
-    public string? DateFormat { get; set; }
-}
-
-internal class AppSettings
-{
-    public const string FileName = "appsettings.json";
-    public const string DefaultQueryFolderName = "queries";
-    public const string DefaultOutputFolderName = "output";
-    public const string DefaultSqlFileEncoding = "UTF-8";
-    public const int DefaultQueryTimeout = 30;
-    public const int DefaultLogRetentionDays = 30;
+    internal const string FileName = "appsettings.json";
+    internal const string DefaultQueryFolderName = "queries";
+    internal const string DefaultOutputFolderName = "output";
+    internal const string DefaultSqlFileEncoding = "UTF-8";
+    internal const int DefaultQueryTimeout = 30;
+    internal const int DefaultLogRetentionDays = 30;
 
     private const string QueryFolderKey = "QueryFolder";
     private const string OutputFolderKey = "OutputFolder";
@@ -41,20 +23,20 @@ internal class AppSettings
     private const string NewLineKey = "CsvSettings:NewLine";
     private const string DateFormatKey = "CsvSettings:DateFormat";
 
-    public List<ConnectionEntry> Connections { get; set; } = [];
-    public string QueryFolder { get; set; } = "";
-    public string OutputFolder { get; set; } = "";
-    public int QueryTimeout { get; set; } = DefaultQueryTimeout;
-    public string SqlFileEncoding { get; set; } = DefaultSqlFileEncoding;
-    public int LogRetentionDays { get; set; } = DefaultLogRetentionDays;
-    public CsvSettings CsvSettings { get; set; } = new();
+    internal IReadOnlyList<ConnectionEntry> Connections { get; init; } = [];
+    internal string QueryFolder { get; init; } = "";
+    internal string OutputFolder { get; init; } = "";
+    internal int QueryTimeout { get; init; } = DefaultQueryTimeout;
+    internal string SqlFileEncoding { get; init; } = DefaultSqlFileEncoding;
+    internal int LogRetentionDays { get; init; } = DefaultLogRetentionDays;
+    internal CsvSettings CsvSettings { get; init; } = new();
 
     // Returns the settings to run on, plus one notice per configured value that was
     // rejected. A missing or unreadable file is itself a notice, never a failure
     // (docs/rules/configuration.md, Configuration Values).
-    public static (AppSettings Settings, IReadOnlyList<string> Notices) Load()
+    internal static (AppSettings Settings, IReadOnlyList<string> Notices) Load()
     {
-        var baseDirectory = AppContext.BaseDirectory;
+        string baseDirectory = AppContext.BaseDirectory;
 
         if (!File.Exists(Path.Combine(baseDirectory, FileName)))
         {
@@ -83,8 +65,7 @@ internal class AppSettings
         IConfiguration config,
         string baseDirectory)
     {
-        var notices = new List<string>();
-        var settings = Defaults(baseDirectory);
+        List<string> notices = [];
 
         T Accept<T>((T Value, string? Notice) resolved)
         {
@@ -94,25 +75,33 @@ internal class AppSettings
             return resolved.Value;
         }
 
-        settings.Connections = config.GetSection("Connections").GetChildren()
-            .Select(entry => new ConnectionEntry
+        // Members initialize in the order written, which is the order notices are reported in.
+        AppSettings settings = new()
+        {
+            Connections =
+            [
+                .. config.GetSection("Connections").GetChildren()
+                    .Select(entry => new ConnectionEntry
+                    {
+                        Name = entry["Name"] ?? "",
+                        ConnectionString = entry["ConnectionString"] ?? "",
+                    }),
+            ],
+            QueryFolder = Accept(ResolveFolder(
+                config, QueryFolderKey, Path.Combine(baseDirectory, DefaultQueryFolderName), baseDirectory, mustExist: true)),
+            OutputFolder = Accept(ResolveFolder(
+                config, OutputFolderKey, Path.Combine(baseDirectory, DefaultOutputFolderName), baseDirectory, mustExist: false)),
+            QueryTimeout = Accept(ResolvePositiveNumber(config, QueryTimeoutKey, DefaultQueryTimeout)),
+            LogRetentionDays = Accept(ResolvePositiveNumber(config, LogRetentionDaysKey, DefaultLogRetentionDays)),
+            SqlFileEncoding = Accept(ResolveEncodingName(config, SqlFileEncodingKey)),
+            CsvSettings = new CsvSettings
             {
-                Name = entry["Name"] ?? "",
-                ConnectionString = entry["ConnectionString"] ?? "",
-            })
-            .ToList();
-
-        settings.QueryFolder = Accept(ResolveFolder(
-            config, QueryFolderKey, Path.Combine(baseDirectory, DefaultQueryFolderName), baseDirectory, mustExist: true));
-        settings.OutputFolder = Accept(ResolveFolder(
-            config, OutputFolderKey, Path.Combine(baseDirectory, DefaultOutputFolderName), baseDirectory, mustExist: false));
-        settings.QueryTimeout = Accept(ResolvePositiveNumber(config, QueryTimeoutKey, DefaultQueryTimeout));
-        settings.LogRetentionDays = Accept(ResolvePositiveNumber(config, LogRetentionDaysKey, DefaultLogRetentionDays));
-        settings.SqlFileEncoding = Accept(ResolveEncodingName(config, SqlFileEncodingKey));
-        settings.CsvSettings.Delimiter = Accept(ResolveDelimiter(config, DelimiterKey));
-        settings.CsvSettings.NullValue = config[NullValueKey] ?? CsvSettings.DefaultNullValue;
-        settings.CsvSettings.NewLine = Accept(ResolveNewLine(config, NewLineKey));
-        settings.CsvSettings.DateFormat = Accept(ResolveDateFormat(config, DateFormatKey));
+                Delimiter = Accept(ResolveDelimiter(config, DelimiterKey)),
+                NullValue = config[NullValueKey] ?? CsvSettings.DefaultNullValue,
+                NewLine = Accept(ResolveNewLine(config, NewLineKey)),
+                DateFormat = Accept(ResolveDateFormat(config, DateFormatKey)),
+            },
+        };
 
         return (settings, notices);
     }
@@ -120,12 +109,12 @@ internal class AppSettings
     // The reason the configuration cannot be used, or null when it can. Connections is
     // required input rather than a defaulted value: no built-in value can name the
     // server an operator means to query (docs/rules/QueryToCsv.md, Required Input).
-    public string? ValidationError()
+    internal string? ValidationError()
     {
         if (Connections.Count == 0)
             return "Connections must contain at least one entry.";
 
-        for (var i = 0; i < Connections.Count; i++)
+        for (int i = 0; i < Connections.Count; i++)
         {
             if (string.IsNullOrWhiteSpace(Connections[i].Name))
                 return $"Connections[{i}].Name is required.";
@@ -153,7 +142,7 @@ internal class AppSettings
         string baseDirectory,
         bool mustExist)
     {
-        var raw = config[key];
+        string? raw = config[key];
         if (raw is null)
             return (fallback, null);
 
@@ -178,11 +167,11 @@ internal class AppSettings
 
     private static (int Value, string? Notice) ResolvePositiveNumber(IConfiguration config, string key, int fallback)
     {
-        var raw = config[key];
+        string? raw = config[key];
         if (raw is null)
             return (fallback, null);
 
-        if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value > 0)
+        if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) && value > 0)
             return (value, null);
 
         return (fallback, $"{DisplayKey(key)} \"{raw}\" is not a whole number greater than 0; using {fallback}.");
@@ -190,7 +179,7 @@ internal class AppSettings
 
     private static (string Value, string? Notice) ResolveEncodingName(IConfiguration config, string key)
     {
-        var raw = config[key];
+        string? raw = config[key];
         if (raw is null)
             return (DefaultSqlFileEncoding, null);
 
@@ -208,7 +197,7 @@ internal class AppSettings
 
     private static (string Value, string? Notice) ResolveDelimiter(IConfiguration config, string key)
     {
-        var raw = config[key];
+        string? raw = config[key];
         if (raw is null)
             return (CsvSettings.DefaultDelimiter, null);
 
@@ -221,7 +210,7 @@ internal class AppSettings
 
     private static (string Value, string? Notice) ResolveNewLine(IConfiguration config, string key)
     {
-        var raw = config[key];
+        string? raw = config[key];
         if (raw is null)
             return (CsvSettings.DefaultNewLine, null);
 
@@ -234,7 +223,7 @@ internal class AppSettings
 
     private static (string? Value, string? Notice) ResolveDateFormat(IConfiguration config, string key)
     {
-        var raw = config[key];
+        string? raw = config[key];
         if (raw is null)
             return (null, null);
 

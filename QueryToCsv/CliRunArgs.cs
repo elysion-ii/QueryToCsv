@@ -15,11 +15,11 @@ internal sealed record CliRunArgs(
         string? inlineQuery = null;
         string? sqlFile = null;
         string encodingName = DefaultEncodingName;
-        var includeHeader = true;
+        bool includeHeader = true;
 
-        for (var i = 0; i < args.Length; i++)
+        for (int i = 0; i < args.Length; i++)
         {
-            var argument = args[i];
+            string argument = args[i];
             if (argument == "--")
             {
                 if (i + 1 < args.Length)
@@ -28,11 +28,11 @@ internal sealed record CliRunArgs(
                 break;
             }
 
-            var equalsIndex = argument.StartsWith("--", StringComparison.Ordinal)
+            int equalsIndex = argument.StartsWith("--", StringComparison.Ordinal)
                 ? argument.IndexOf('=')
                 : -1;
-            var option = equalsIndex >= 0 ? argument[..equalsIndex] : argument;
-            var attachedValue = equalsIndex >= 0 ? argument[(equalsIndex + 1)..] : null;
+            string option = equalsIndex >= 0 ? argument[..equalsIndex] : argument;
+            string? attachedValue = equalsIndex >= 0 ? argument[(equalsIndex + 1)..] : null;
 
             switch (option)
             {
@@ -43,7 +43,7 @@ internal sealed record CliRunArgs(
                             option,
                             attachedValue,
                             out connectionName,
-                            out var connectionError))
+                            out string? connectionError))
                         return (null, connectionError);
                     break;
                 case "--query":
@@ -53,7 +53,7 @@ internal sealed record CliRunArgs(
                             option,
                             attachedValue,
                             out inlineQuery,
-                            out var queryError))
+                            out string? queryError))
                         return (null, queryError);
                     break;
                 case "-f" or "--file":
@@ -63,7 +63,7 @@ internal sealed record CliRunArgs(
                             option,
                             attachedValue,
                             out sqlFile,
-                            out var fileError))
+                            out string? fileError))
                         return (null, fileError);
                     break;
                 case "-e" or "--encoding":
@@ -73,7 +73,7 @@ internal sealed record CliRunArgs(
                             option,
                             attachedValue,
                             out encodingName,
-                            out var encodingError))
+                            out string? encodingError))
                         return (null, encodingError);
                     break;
                 case "--header":

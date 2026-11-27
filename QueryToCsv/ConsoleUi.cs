@@ -3,71 +3,79 @@ using Microsoft.Data.SqlClient;
 
 namespace QueryToCsv;
 
+// Every prompt returns null when standard input ends (Ctrl+Z), so the caller decides
+// how the run ends and records it (docs/specs/QueryToCsv.md, QueryToCsv-004).
 internal static class ConsoleUi
 {
-    public static int SelectQuery(string[] fileNames)
+    internal const int DirectEntry = -1;
+
+    // The index of the chosen .sql file, DirectEntry for option 0, or null when input ends.
+    internal static int? SelectQuery(IReadOnlyList<string> fileNames)
     {
         Console.Error.WriteLine("=== Select a query ===");
         Console.Error.WriteLine("0. Enter query directly");
-        for (var i = 0; i < fileNames.Length; i++)
+        for (int i = 0; i < fileNames.Count; i++)
             Console.Error.WriteLine($"{i + 1}. {fileNames[i]}");
         Console.Error.WriteLine();
 
         while (true)
         {
             Console.Error.Write("Enter number: ");
-            var input = Console.ReadLine();
-            if (input is null) Environment.Exit(1);
+            string? input = Console.ReadLine();
+            if (input is null)
+                return null;
 
-            if (int.TryParse(input, out var num))
+            if (int.TryParse(input, out int num))
             {
                 if (num == 0)
-                    return -1;
+                    return DirectEntry;
 
-                if (num >= 1 && num <= fileNames.Length)
+                if (num >= 1 && num <= fileNames.Count)
                     return num - 1;
             }
 
-            Console.Error.WriteLine($"Please enter a number between 0 and {fileNames.Length}.");
+            Console.Error.WriteLine($"Please enter a number between 0 and {fileNames.Count}.");
         }
     }
 
-    public static string InputQuery()
+    // The typed SQL, or null when nothing but whitespace was entered. End of input ends
+    // the SQL rather than the run.
+    internal static string? InputQuery()
     {
         Console.Error.WriteLine("Enter SQL query (end with Ctrl+Z):");
-        var lines = new List<string>();
+        List<string> lines = [];
         while (true)
         {
             Console.Error.Write("  > ");
-            var line = Console.ReadLine();
-            if (line is null) break;
+            string? line = Console.ReadLine();
+            if (line is null)
+                break;
             lines.Add(line);
         }
-        var sql = string.Join(Environment.NewLine, lines);
-        if (string.IsNullOrWhiteSpace(sql))
-        {
-            ConsoleMessages.WriteError("no query entered.");
-            Environment.Exit(1);
-        }
-        return sql;
+
+        string sql = string.Join(Environment.NewLine, lines);
+        return string.IsNullOrWhiteSpace(sql) ? null : sql;
     }
 
-    public static bool AskIncludeHeader()
+    internal static bool? AskIncludeHeader()
     {
         while (true)
         {
             Console.Error.Write("Include header row? (y/n): ");
-            var input = Console.ReadLine();
-            if (input is null) Environment.Exit(1);
+            string? input = Console.ReadLine();
+            if (input is null)
+                return null;
 
-            if (input.Equals("y", StringComparison.OrdinalIgnoreCase)) return true;
-            if (input.Equals("n", StringComparison.OrdinalIgnoreCase)) return false;
+            if (input.Equals("y", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (input.Equals("n", StringComparison.OrdinalIgnoreCase))
+                return false;
 
             Console.Error.WriteLine("Please enter y or n.");
         }
     }
 
-    public static Encoding SelectEncoding()
+    internal static Encoding? SelectEncoding()
     {
         Console.Error.WriteLine("=== Select encoding ===");
         Console.Error.WriteLine("1. UTF-8");
@@ -79,10 +87,11 @@ internal static class ConsoleUi
         while (true)
         {
             Console.Error.Write("Enter number: ");
-            var input = Console.ReadLine();
-            if (input is null) Environment.Exit(1);
+            string? input = Console.ReadLine();
+            if (input is null)
+                return null;
 
-            var encoding = input switch
+            Encoding? encoding = input switch
             {
                 "1" => ResolveEncoding("utf-8"),
                 "2" => ResolveEncoding("utf-8-bom"),
@@ -98,7 +107,7 @@ internal static class ConsoleUi
         }
     }
 
-    public static Encoding? ResolveEncoding(string name)
+    internal static Encoding? ResolveEncoding(string name)
     {
         return name.ToLowerInvariant() switch
         {
@@ -110,15 +119,16 @@ internal static class ConsoleUi
         };
     }
 
-    public static int SelectConnection(IReadOnlyList<ConnectionEntry> connections)
+    // The index of the chosen connection, or null when input ends.
+    internal static int? SelectConnection(IReadOnlyList<ConnectionEntry> connections)
     {
         if (connections.Count == 1)
             return 0;
 
         Console.Error.WriteLine("=== Select connection ===");
-        for (var i = 0; i < connections.Count; i++)
+        for (int i = 0; i < connections.Count; i++)
         {
-            var info = FormatConnectionInfo(connections[i].ConnectionString);
+            string info = FormatConnectionInfo(connections[i].ConnectionString);
             Console.Error.WriteLine($"{i + 1}. {connections[i].Name} ({info})");
         }
         Console.Error.WriteLine();
@@ -126,27 +136,29 @@ internal static class ConsoleUi
         while (true)
         {
             Console.Error.Write("Enter number: ");
-            var input = Console.ReadLine();
-            if (input is null) Environment.Exit(1);
+            string? input = Console.ReadLine();
+            if (input is null)
+                return null;
 
-            if (int.TryParse(input, out var num) && num >= 1 && num <= connections.Count)
+            if (int.TryParse(input, out int num) && num >= 1 && num <= connections.Count)
                 return num - 1;
 
             Console.Error.WriteLine($"Please enter a number between 1 and {connections.Count}.");
         }
-
     }
 
+    // A connection string the builder cannot parse still lists the entry, so the user can
+    // pick it and get the connection failure reported when it is used.
     private static string FormatConnectionInfo(string connectionString)
     {
         try
         {
-            var builder = new SqlConnectionStringBuilder(connectionString);
-            var server = string.IsNullOrEmpty(builder.DataSource) ? "?" : builder.DataSource;
-            var database = string.IsNullOrEmpty(builder.InitialCatalog) ? "?" : builder.InitialCatalog;
+            SqlConnectionStringBuilder builder = new(connectionString);
+            string server = string.IsNullOrEmpty(builder.DataSource) ? "?" : builder.DataSource;
+            string database = string.IsNullOrEmpty(builder.InitialCatalog) ? "?" : builder.InitialCatalog;
             return $"{server} - {database}";
         }
-        catch
+        catch (Exception)
         {
             return "?";
         }

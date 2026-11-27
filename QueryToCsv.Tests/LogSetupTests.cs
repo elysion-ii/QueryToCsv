@@ -10,30 +10,30 @@ public class LogSetupTests
     private const int RetentionDays = 30;
 
     [Fact]
-    public void ResolveDirectory_PreferredDirectoryWritable_KeepsItAndLeavesNoProbeBehind()
+    internal void ResolveDirectory_PreferredDirectoryWritable_KeepsItAndLeavesNoProbeBehind()
     {
         using var dir = new TempDirectory();
-        var preferred = Path.Combine(dir.Path, "logs");
-        var fallback = Path.Combine(dir.Path, "appdata-logs");
+        string preferred = Path.Combine(dir.Path, "logs");
+        string fallback = Path.Combine(dir.Path, "appdata-logs");
 
-        var resolved = LogSetup.ResolveDirectory(preferred, fallback);
+        string resolved = LogSetup.ResolveDirectory(preferred, fallback);
 
         Assert.Equal(preferred, resolved);
         Assert.Empty(Directory.GetFileSystemEntries(preferred));
     }
 
     [Fact]
-    public void ResolveDirectory_PreferredDirectoryUnusable_UsesTheFallback()
+    internal void ResolveDirectory_PreferredDirectoryUnusable_UsesTheFallback()
     {
         using var dir = new TempDirectory();
 
         // A file where the directory would go: creating the directory fails, which is
         // what an application folder the installation cannot write to looks like here.
-        var blocker = Path.Combine(dir.Path, "blocked");
+        string blocker = Path.Combine(dir.Path, "blocked");
         File.WriteAllText(blocker, "");
 
-        var preferred = Path.Combine(blocker, "logs");
-        var fallback = Path.Combine(dir.Path, "appdata-logs");
+        string preferred = Path.Combine(blocker, "logs");
+        string fallback = Path.Combine(dir.Path, "appdata-logs");
 
         Assert.Equal(fallback, LogSetup.ResolveDirectory(preferred, fallback));
     }
@@ -45,12 +45,12 @@ public class LogSetupTests
     [InlineData(29, true)]
     [InlineData(30, false)]
     [InlineData(365, false)]
-    public void DeleteExpiredLogs_DailyFile_KeepsTheMostRecentRetentionDays(int daysOld, bool kept)
+    internal void DeleteExpiredLogs_DailyFile_KeepsTheMostRecentRetentionDays(int daysOld, bool kept)
     {
         using var dir = new TempDirectory();
         // The stamp the application writes is invariant-culture, whatever the machine runs
-        var stamp = Now.Date.AddDays(-daysOld).ToString("yyyyMMdd", CultureInfo.InvariantCulture);
-        var name = $"QueryToCsv_{stamp}.log";
+        string stamp = Now.Date.AddDays(-daysOld).ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+        string name = $"QueryToCsv_{stamp}.log";
         File.WriteAllText(Path.Combine(dir.Path, name), "");
 
         LogSetup.DeleteExpiredLogs(dir.Path, RetentionDays, Now);
@@ -65,7 +65,7 @@ public class LogSetupTests
     [InlineData("QueryToCsv_notadate.log")]
     [InlineData("QueryToCsv.log")]
     [InlineData("notes.txt")]
-    public void DeleteExpiredLogs_FileOutsideTheNamePattern_IsLeftAlone(string name)
+    internal void DeleteExpiredLogs_FileOutsideTheNamePattern_IsLeftAlone(string name)
     {
         using var dir = new TempDirectory();
         File.WriteAllText(Path.Combine(dir.Path, name), "");
@@ -76,7 +76,7 @@ public class LogSetupTests
     }
 
     [Fact]
-    public void DeleteExpiredLogs_MissingDirectory_DoesNothing()
+    internal void DeleteExpiredLogs_MissingDirectory_DoesNothing()
     {
         using var dir = new TempDirectory();
 

@@ -35,9 +35,9 @@ public class CliInvocationTests
 
     [Theory]
     [MemberData(nameof(Modes))]
-    public void Parse_KnownMode_ReturnsExpectedMode(string[] args, string expectedMode)
+    internal void Parse_KnownMode_ReturnsExpectedMode(string[] args, string expectedMode)
     {
-        var (invocation, error) = CliInvocation.Parse(args);
+        (CliInvocation? invocation, string? error) = CliInvocation.Parse(args);
 
         Assert.Null(error);
         Assert.NotNull(invocation);
@@ -46,9 +46,9 @@ public class CliInvocationTests
 
     [Theory]
     [MemberData(nameof(OpenInvocations))]
-    public void Parse_OpenMode_ReturnsTarget(string[] args, string expectedTarget)
+    internal void Parse_OpenMode_ReturnsTarget(string[] args, string expectedTarget)
     {
-        var (invocation, error) = CliInvocation.Parse(args);
+        (CliInvocation? invocation, string? error) = CliInvocation.Parse(args);
 
         Assert.Null(error);
         Assert.NotNull(invocation);
@@ -57,9 +57,9 @@ public class CliInvocationTests
 
     [Theory]
     [MemberData(nameof(RejectedInvocations))]
-    public void Parse_InvalidInvocation_ReturnsExpectedError(string[] args, string expectedError)
+    internal void Parse_InvalidInvocation_ReturnsExpectedError(string[] args, string expectedError)
     {
-        var (invocation, error) = CliInvocation.Parse(args);
+        (CliInvocation? invocation, string? error) = CliInvocation.Parse(args);
 
         Assert.Null(invocation);
         Assert.Equal(expectedError, error);

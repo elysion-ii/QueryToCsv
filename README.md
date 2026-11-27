@@ -10,7 +10,7 @@ A CLI tool that connects to Microsoft SQL Server, executes `.sql` files, and exp
 - Configurable delimiter, null representation, newline, and date format
 - Choice of CSV encoding: UTF-8, UTF-8 with BOM, UTF-16 LE, Shift-JIS
 - Optional header row
-- SELECT-only enforcement (INSERT, UPDATE, DELETE, and other non-SELECT statements are rejected)
+- SELECT-only enforcement: the query is parsed as T-SQL, and anything but a single SELECT statement is rejected before it reaches the server
 - Logging to file with daily rotation and configurable retention
 - Self-contained single-file executable (.NET runtime not required)
 
@@ -72,7 +72,7 @@ Define one or more named connections in the `Connections` array. At startup, you
 
 ### 3. Add SQL Files
 
-Place `.sql` files in the `queries/` folder (or whichever folder `QueryFolder` points to). Only SELECT statements are allowed — the tool will reject files containing INSERT, UPDATE, DELETE, DROP, or other data-modifying statements.
+Place `.sql` files in the `queries/` folder (or whichever folder `QueryFolder` points to). Each file holds exactly one SELECT statement, optionally preceded by `WITH` common table expressions. Anything else is rejected before it reaches the server: a data-modifying statement, `SELECT ... INTO`, a second statement or a `GO`-separated batch, or a read through `OPENROWSET`, `OPENQUERY`, or `OPENDATASOURCE`.
 
 ### 4. Run
 

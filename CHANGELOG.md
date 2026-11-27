@@ -9,6 +9,25 @@ to build an installer for a version that has no heading here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking**: the SELECT-only check parses the query as T-SQL and accepts only a single
+  `SELECT` statement, optionally preceded by `WITH` common table expressions. The keyword
+  scan it replaces let other statements through when they followed a `SELECT` without a
+  semicolon (`SELECT 1 SHUTDOWN`) or used a word not on its list (`DBCC`, `KILL`,
+  `BACKUP`, a bare procedure name). Now rejected as well: several statements in one query
+  (`SELECT 1; SELECT 2`), a `GO`-separated second batch, `OPENROWSET(BULK ...)`, empty
+  text, and text that is not valid T-SQL. Bracketed identifiers that are keywords, such as
+  `[Update]`, are now accepted.
+
+### Fixed
+
+- Ending input with Ctrl+Z at a prompt now records the end of the run and its exit code
+  in the log, which the run previously skipped.
+- Failures that end a run — an unknown `-e` encoding, a `-c` connection that is not
+  configured, a missing `--connection` with several connections, a missing `-f` file, and
+  an empty direct entry — are now written to the log as well as to standard error.
+
 ## [3.0.0] - 2026-09-07
 
 ### Changed

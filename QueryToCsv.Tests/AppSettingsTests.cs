@@ -42,25 +42,25 @@ public class AppSettingsTests
 
     [Theory]
     [MemberData(nameof(RejectedValues))]
-    public void FromConfiguration_RejectedValue_ReportsItAndUsesTheDefault(
+    internal void FromConfiguration_RejectedValue_ReportsItAndUsesTheDefault(
         string key,
         string value,
         string expectedNotice)
     {
         using var dir = new TempDirectory();
 
-        var (settings, notices) = AppSettings.FromConfiguration(Configuration((key, value)), dir.Path);
+        (AppSettings settings, IReadOnlyList<string> notices) = AppSettings.FromConfiguration(Configuration((key, value)), dir.Path);
 
         Assert.Equal([expectedNotice.Replace(BaseDirectoryPlaceholder, dir.Path)], notices);
         AssertBuiltInDefaults(settings, dir.Path);
     }
 
     [Fact]
-    public void FromConfiguration_EmptyConfiguration_UsesTheDefaultsAndReportsNothing()
+    internal void FromConfiguration_EmptyConfiguration_UsesTheDefaultsAndReportsNothing()
     {
         using var dir = new TempDirectory();
 
-        var (settings, notices) = AppSettings.FromConfiguration(Configuration(), dir.Path);
+        (AppSettings settings, IReadOnlyList<string> notices) = AppSettings.FromConfiguration(Configuration(), dir.Path);
 
         Assert.Empty(notices);
         Assert.Empty(settings.Connections);
@@ -68,13 +68,13 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void FromConfiguration_UsableValues_AreKeptAndReportNothing()
+    internal void FromConfiguration_UsableValues_AreKeptAndReportNothing()
     {
         using var dir = new TempDirectory();
-        var queryFolder = Path.Combine(dir.Path, "sql");
+        string queryFolder = Path.Combine(dir.Path, "sql");
         Directory.CreateDirectory(queryFolder);
 
-        var (settings, notices) = AppSettings.FromConfiguration(
+        (AppSettings settings, IReadOnlyList<string> notices) = AppSettings.FromConfiguration(
             Configuration(
                 ("QueryFolder", "sql"),
                 ("OutputFolder", "csv"),
@@ -100,13 +100,13 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void FromConfiguration_AbsoluteFolders_AreKeptAsWritten()
+    internal void FromConfiguration_AbsoluteFolders_AreKeptAsWritten()
     {
         using var dir = new TempDirectory();
-        var elsewhere = Path.Combine(dir.Path, "elsewhere");
+        string elsewhere = Path.Combine(dir.Path, "elsewhere");
         Directory.CreateDirectory(elsewhere);
 
-        var (settings, notices) = AppSettings.FromConfiguration(
+        (AppSettings settings, IReadOnlyList<string> notices) = AppSettings.FromConfiguration(
             Configuration(("QueryFolder", elsewhere), ("OutputFolder", elsewhere)),
             dir.Path);
 
@@ -116,11 +116,11 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void FromConfiguration_SeveralRejectedValues_ReportsEachOnce()
+    internal void FromConfiguration_SeveralRejectedValues_ReportsEachOnce()
     {
         using var dir = new TempDirectory();
 
-        var (_, notices) = AppSettings.FromConfiguration(
+        (AppSettings _, IReadOnlyList<string> notices) = AppSettings.FromConfiguration(
             Configuration(("QueryTimeout", "0"), ("CsvSettings:NewLine", "CR")),
             dir.Path);
 
@@ -133,11 +133,11 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void FromConfiguration_Connections_AreReadInConfigurationOrder()
+    internal void FromConfiguration_Connections_AreReadInConfigurationOrder()
     {
         using var dir = new TempDirectory();
 
-        var (settings, _) = AppSettings.FromConfiguration(
+        (AppSettings settings, IReadOnlyList<string> _) = AppSettings.FromConfiguration(
             Configuration(
                 ("Connections:0:Name", "Dev"),
                 ("Connections:0:ConnectionString", "Server=dev;Database=a;"),
@@ -155,7 +155,7 @@ public class AppSettingsTests
     [InlineData("Dev Server", "", "Connections[0].ConnectionString is required.")]
     [InlineData("Dev Server", "   ", "Connections[0].ConnectionString is required.")]
     [InlineData("Dev Server", "Server=x;Database=y;", null)]
-    public void ValidationError_ConnectionEntry_RequiresNameAndConnectionString(
+    internal void ValidationError_ConnectionEntry_RequiresNameAndConnectionString(
         string name,
         string connectionString,
         string? expected)
@@ -169,7 +169,7 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void ValidationError_NoConnections_NamesTheMissingSetting()
+    internal void ValidationError_NoConnections_NamesTheMissingSetting()
     {
         var settings = new AppSettings();
 
@@ -177,7 +177,7 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void ValidationError_SecondConnectionIncomplete_NamesThatEntry()
+    internal void ValidationError_SecondConnectionIncomplete_NamesThatEntry()
     {
         var settings = new AppSettings
         {
@@ -192,7 +192,7 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void Constructor_NoConfiguration_AppliesDocumentedDefaults()
+    internal void Constructor_NoConfiguration_AppliesDocumentedDefaults()
     {
         var settings = new AppSettings();
 
