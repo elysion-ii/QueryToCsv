@@ -168,8 +168,13 @@ A tag must never outlive its release, so remove both in one step:
 
 ```powershell
 gh release delete v{previous} --yes --cleanup-tag
-git tag -d v{previous}
+if (git tag -l v{previous}) { git tag -d v{previous} }
 ```
+
+`--cleanup-tag` deletes the tag on `origin`. Run inside the clone, gh 2.106.0 also deletes
+the local tag, and then an unconditional `git tag -d v{previous}` fails with
+`tag 'v{previous}' not found`; the second line therefore deletes the local tag only when
+it is still there, whichever gh version ran the first.
 
 Confirmation: `gh release list` shows only `v{version}`, `git ls-remote --tags origin`
 lists only `refs/tags/v{version}`, and `git tag -l` no longer prints `v{previous}`.
