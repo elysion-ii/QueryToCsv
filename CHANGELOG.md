@@ -9,6 +9,8 @@ to build an installer for a version that has no heading here.
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-11-27
+
 ### Changed
 
 - **Breaking**: SQL Server authentication takes its user name and password from Windows
