@@ -21,7 +21,7 @@ gone — only the current version stays published.
 
 - The repository root — the directory containing `QueryToCsv.slnx` — is the working
   directory for every command below unless a step names another one
-- Inno Setup 6 or later is installed; `build/Installer.ps1` finds it through the
+- Inno Setup 6.3 or later is installed; `build/Installer.ps1` finds it through the
   uninstall registry, `PATH`, the `.iss` file association, or the default install
   locations, and aborts when none of them yields `ISCC.exe`
 - `gh auth status` reports an account with push access to `elysion-ii/QueryToCsv`
@@ -91,8 +91,9 @@ published assets come from the workflow.
 ### 6. Build the portable EXE
 
 Run `powershell -ExecutionPolicy Bypass -File build/Build.ps1`. It checks the
-configuration files, verifies formatting, runs the test suite, and publishes the
-self-contained single-file EXE; a failure in any gate stops it before publishing.
+configuration files, verifies formatting, checks requirement coverage, runs the test
+suite, and publishes the self-contained single-file EXE; a failure in any gate stops it
+before publishing.
 
 Confirmation: the command exits 0, `build/QueryToCsv/` holds `QueryToCsv.exe`,
 `appsettings.json`, and the empty `queries/` and `output/` folders with no DLL beside
