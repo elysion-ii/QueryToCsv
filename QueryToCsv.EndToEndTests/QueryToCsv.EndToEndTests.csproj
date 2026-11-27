@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- End-to-end tests: they launch the executable build/Build.ps1 produced and reach it
+       only through its command line, standard streams, files, and exit code. The
+       application project is deliberately not referenced. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <!-- CredentialManager.cs declares the Credential Manager calls with LibraryImport,
+         whose generated marshalling is unsafe code -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- CA1707: test method names use the Method_Scenario_ExpectedResult convention, which requires underscores -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+    <PackageReference Include="xunit" Version="2.*" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.*" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\QueryToCsv.TestSupport\QueryToCsv.TestSupport.csproj" />
+  </ItemGroup>
+</Project>

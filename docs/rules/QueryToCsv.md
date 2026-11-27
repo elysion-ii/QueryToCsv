@@ -6,8 +6,8 @@ created: 2026-07-27
 # QueryToCsv Rules
 
 Application-specific rules for QueryToCsv. Write only deltas and overrides against the
-shared rules (`standard.md`, `dotnet.md` in this directory) — never copy shared rule
-text here. On conflict, this file wins.
+shared and stack rules in this directory — never copy their text here. On conflict, this
+file wins.
 
 ## Repository Language
 
@@ -20,24 +20,26 @@ text here. On conflict, this file wins.
 
 ## Required Input
 
-Overrides Configuration Values in `standard.md`, which has every configurable value fall
-back to a built-in default.
+Overrides Configuration Values in `configuration.md` on two points: which settings carry
+no default, and which default substitutions are reported.
 
-- **`Connections` is required input, not a defaulted value.** No built-in value can name
+- **`Connections` is the only setting without a default.** No built-in value can name
   the server an operator means to query, so a configuration with no entry — or with an
   entry whose `Name` or `ConnectionString` is blank — ends the run with exit code 1.
-  Every other setting follows the shared rule and falls back to its default
-- **An absent setting is not a rejected value.** The shared rule's report names what was
-  rejected, so only a value that is present and unusable is reported; a key the operator
-  left out takes its default silently
+  Every other setting, including the folder settings, falls back to its default
+- **An absent setting is not a rejected value.** `configuration.md` reports every
+  substitution, a missing value included; here only a value that is present and unusable
+  is reported, and a key the operator left out takes its default silently
 
 ## Application Rules
 
-- **Only SELECT statements may reach the server.** `QueryExecutor.IsSelectOnly` strips
-  comments and string literals, then rejects the statement if any data-modifying or
-  out-of-scope keyword remains. A change that widens what the tool may execute is a
-  specification change first (`docs/specs/QueryToCsv.md`), never an inline relaxation of
-  the keyword list
+- **Only SELECT statements may reach the server.** `QueryExecutor.IsSelectOnly` parses
+  the text as T-SQL and accepts only what QTC-15 in `docs/specs/QueryToCsv.md`
+  states. The decision is made on the parse tree, never on keywords found in the text,
+  because T-SQL places one statement after another without any separator: a keyword list
+  cannot see where the `SELECT` ends and the next statement begins. A change that widens
+  what the tool may execute is a specification change first, never an inline relaxation
+  of the check
 
 ## Release Constraints
 

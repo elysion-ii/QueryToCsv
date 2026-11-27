@@ -2,7 +2,11 @@
 
 param(
     [string]$Configuration = "Release",
-    [string]$Runtime = "win-x64"
+    [string]$Runtime = "win-x64",
+    # Boundary tests need Docker for their SQL Server. Pass this only where an earlier
+    # step already ran them on the same commit (the release workflow does so on Linux,
+    # because Windows runners cannot start Linux containers); every other build runs them.
+    [switch]$SkipBoundaryTests
 )
 
 # Build folder is the current location, solution root is parent
@@ -15,7 +19,6 @@ $OutputDir = Join-Path $BuildDir "QueryToCsv"
 $PublishDir = Join-Path $BuildDir "publish_temp"
 $ProjectPath = "QueryToCsv\QueryToCsv.csproj"
 
-# Check dotnet CLI is available
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     Write-Host "   [ERROR] dotnet CLI not found. Please install .NET SDK." -ForegroundColor Red
     exit 1
@@ -28,12 +31,9 @@ if (-not (Test-Path $ProjectPath)) {
     exit 1
 }
 
-# Cleanup temp folder
 if (Test-Path $PublishDir) { Remove-Item $PublishDir -Recurse -Force }
-# Clean existing output folder
 if (Test-Path $OutputDir) { Remove-Item $OutputDir -Recurse -Force }
 
-# Create output folder
 New-Item -ItemType Directory -Path $OutputDir -Force -ErrorAction SilentlyContinue | Out-Null
 
 # Only the placeholder template of a configuration file belongs in the repository:
@@ -65,8 +65,48 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "Running QueryToCsv tests..." -ForegroundColor Cyan
-dotnet test QueryToCsv.Tests\QueryToCsv.Tests.csproj -c $Configuration
+# Every requirement a specification states is named by a test, and no test names a
+# requirement no specification states
+# (rules: docs/rules/testing.md, Requirement Coverage; docs/rules/dotnet.md, REQCOV)
+Write-Host "Verifying requirement coverage..." -ForegroundColor Cyan
+# IDs compare exactly, case included (docs/rules/documentation.md, Requirement IDs)
+$RequirementHeading = '(?m)^\s*#{1,6}\s+([A-Z][A-Z0-9]*-\d+):'
+$RequirementIds = @()
+if (Test-Path "docs\specs") {
+    # An HTML comment is not part of the specification (e.g., the skeleton's example heading)
+    $RequirementIds = @(Get-ChildItem "docs\specs" -Recurse -Filter *.md |
+        ForEach-Object { [regex]::Replace([System.IO.File]::ReadAllText($_.FullName), '(?s)<!--.*?-->', '') } |
+        ForEach-Object { [regex]::Matches($_, $RequirementHeading) } |
+        ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
+}
+$TestSource = (Get-ChildItem -Directory | Where-Object { $_.Name -like "*Tests" } |
+    Get-ChildItem -Recurse -Filter *.cs | Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' } |
+    ForEach-Object { [System.IO.File]::ReadAllText($_.FullName) }) -join "`n"
+$Unnamed = @($RequirementIds | Where-Object {
+    $TestSource -cnotmatch ('(?<![A-Za-z0-9])' + [regex]::Escape($_) + '(?![0-9])')
+})
+$TraitIds = @([regex]::Matches($TestSource, 'Trait\(\s*"Requirement"\s*,\s*"([^"]*)"\s*\)') |
+    ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
+$Missing = @($TraitIds | Where-Object { $RequirementIds -cnotcontains $_ })
+if ($Unnamed.Count -gt 0 -or $Missing.Count -gt 0) {
+    if ($Unnamed.Count -gt 0) {
+        Write-Host "   [ERROR] No test names these requirements: $($Unnamed -join ', ')" -ForegroundColor Red
+    }
+    if ($Missing.Count -gt 0) {
+        Write-Host "   [ERROR] Tests name requirements no specification states: $($Missing -join ', ')" -ForegroundColor Red
+    }
+    Write-Host "           See docs/rules/dotnet.md, REQCOV" -ForegroundColor Red
+    Write-Host "`n=== Build Failed ===" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Running QueryToCsv unit and boundary tests..." -ForegroundColor Cyan
+$TestArgs = @("QueryToCsv.Tests\QueryToCsv.Tests.csproj", "-c", $Configuration)
+if ($SkipBoundaryTests) {
+    Write-Host "   Boundary tests skipped: run by an earlier step on this commit" -ForegroundColor Yellow
+    $TestArgs += @("--filter", "Category!=Boundary")
+}
+dotnet test @TestArgs
 if ($LASTEXITCODE -ne 0) {
     Write-Host "   [ERROR] Tests failed - build aborted" -ForegroundColor Red
     if (Test-Path $PublishDir) { Remove-Item $PublishDir -Recurse -Force }

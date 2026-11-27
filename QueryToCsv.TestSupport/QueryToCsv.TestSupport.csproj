@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Test infrastructure shared by QueryToCsv.Tests and QueryToCsv.EndToEndTests:
+       scratch directories and the test-run SQL Server. It references nothing of the
+       application, so end-to-end tests stay outside it. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.*" />
+    <PackageReference Include="Testcontainers.MsSql" Version="4.*" />
+    <PackageReference Include="xunit.extensibility.core" Version="2.*" />
+  </ItemGroup>
+</Project>

@@ -1,14 +1,5 @@
 namespace QueryToCsv;
 
-internal enum CliMode
-{
-    Interactive,
-    Help,
-    Version,
-    Open,
-    OneLiner,
-}
-
 internal sealed record CliInvocation(
     CliMode Mode,
     string? OpenTarget,
@@ -27,7 +18,7 @@ internal sealed record CliInvocation(
 
         if (args[0] == "--open")
         {
-            if (args.Length == 1)
+            if (args.Length == 1 || args[1].Length == 0)
                 return (null, "option '--open' requires a value.");
 
             if (args.Length > 2)
@@ -39,7 +30,7 @@ internal sealed record CliInvocation(
         const string openPrefix = "--open=";
         if (args[0].StartsWith(openPrefix, StringComparison.Ordinal))
         {
-            var target = args[0][openPrefix.Length..];
+            string target = args[0][openPrefix.Length..];
             if (target.Length == 0)
                 return (null, "option '--open' requires a value.");
 
@@ -49,7 +40,7 @@ internal sealed record CliInvocation(
             return (new CliInvocation(CliMode.Open, target, null), null);
         }
 
-        var (runArgs, error) = CliRunArgs.Parse(args);
+        (CliRunArgs? runArgs, string? error) = CliRunArgs.Parse(args);
         return error is null
             ? (new CliInvocation(CliMode.OneLiner, null, runArgs), null)
             : (null, error);

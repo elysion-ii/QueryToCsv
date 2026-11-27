@@ -5,12 +5,13 @@ namespace QueryToCsv.Tests;
 
 internal static class TestSetup
 {
-    // Shift-JIS lives in the CodePages provider, which the application registers at
-    // startup. Tests exercise the same encoding paths without going through Program.cs,
-    // so they register it too.
+    // The application makes both settings at startup, and tests exercise the same paths
+    // without going through Program.cs: Shift-JIS lives in the CodePages provider, and the
+    // native SNI library is not shipped, so SqlClient must use its managed networking.
     [ModuleInitializer]
-    internal static void RegisterCodePages()
+    internal static void ApplyStartupSettings()
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        AppContext.SetSwitch("Switch.Microsoft.Data.SqlClient.UseManagedNetworkingOnWindows", true);
     }
 }

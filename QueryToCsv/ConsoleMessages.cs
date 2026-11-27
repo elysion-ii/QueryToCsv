@@ -1,26 +1,17 @@
 namespace QueryToCsv;
 
+// Warnings and errors share one form on standard error: "QueryToCsv: <message>".
 internal static class ConsoleMessages
 {
-    internal static void WriteWarning(string message)
+    internal static void Write(string message)
     {
-        WriteTagged(message);
-    }
-
-    internal static void WriteError(string message)
-    {
-        WriteTagged(message);
+        Console.Error.WriteLine($"{ApplicationVersion.ApplicationName}: {message}");
     }
 
     internal static void WriteUsageError(string message)
     {
-        WriteTagged(message);
+        Write(message);
         Console.Error.WriteLine(
             $"Try '{ApplicationVersion.ApplicationName} --help' for more information.");
-    }
-
-    private static void WriteTagged(string message)
-    {
-        Console.Error.WriteLine($"{ApplicationVersion.ApplicationName}: {message}");
     }
 }

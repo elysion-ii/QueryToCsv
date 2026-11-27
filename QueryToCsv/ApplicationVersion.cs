@@ -12,13 +12,13 @@ internal static class ApplicationVersion
     {
         get
         {
-            var informationalVersion = typeof(ApplicationVersion).Assembly
+            string informationalVersion = typeof(ApplicationVersion).Assembly
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
                 .InformationalVersion
                 ?? throw new InvalidOperationException(
                     "AssemblyInformationalVersionAttribute is required for version display.");
 
-            var metadataIndex = informationalVersion.IndexOf(BuildMetadataSeparator);
+            int metadataIndex = informationalVersion.IndexOf(BuildMetadataSeparator);
             return metadataIndex >= 0
                 ? informationalVersion[..metadataIndex]
                 : informationalVersion;

@@ -1,194 +1,105 @@
-using System.Globalization;
 using System.Text;
-using System.Text.RegularExpressions;
-using CsvHelper;
-using CsvHelper.Configuration;
 using Microsoft.Data.SqlClient;
-using NLog;
+using Microsoft.SqlServer.TransactSql.ScriptDom;
 
 namespace QueryToCsv;
 
-public static partial class QueryExecutor
+// The database side of a run: the SELECT-only check on the T-SQL parse tree, and running
+// the query into a CSV file.
+internal static class QueryExecutor
 {
-    private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+    private const int QueryTimeoutErrorNumber = -2;
 
-    [GeneratedRegex(@"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|EXEC|EXECUTE|MERGE|GRANT|REVOKE|DENY|BULK|INTO|OPENROWSET|OPENDATASOURCE|OPENQUERY)\b", RegexOptions.IgnoreCase)]
-    private static partial Regex ProhibitedKeywordsRegex();
-
-    [GeneratedRegex(@"--[^\r\n]*|/\*[\s\S]*?\*/|'(?:[^']|'')*'", RegexOptions.None)]
-    private static partial Regex CommentsAndStringsRegex();
-
-    public static int Execute(AppSettings settings, string connectionString, string sql, string? baseName, bool includeHeader, Encoding csvEncoding)
+    // Runs the query and writes its first result set to a new file at csvPath, returning
+    // the row count. A failure the operator can act on is a RunFailureException
+    // (docs/specs/QueryToCsv.md, QTC-16).
+    internal static async Task<int> ExportAsync(
+        string connectionString,
+        string sql,
+        int queryTimeout,
+        bool includeHeader,
+        Encoding csvEncoding,
+        CsvSettings csvSettings,
+        string csvPath,
+        CancellationToken cancellationToken = default)
     {
-        var label = baseName ?? "Direct Input";
-
-        if (!IsSelectOnly(sql))
-        {
-            Logger.Error($"Rejected: non-SELECT statement in {label}");
-            ConsoleMessages.WriteError("only SELECT statements are allowed.");
-            return 1;
-        }
-
-        var outputPath = BuildOutputPath(settings, baseName);
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-
-        var tempPath = outputPath + ".tmp";
+        // A connection that cannot be opened in time also reports the timeout number; only a
+        // timeout after the connection is open is the query's own (QTC-16).
+        bool opened = false;
         try
         {
-            using var connection = new SqlConnection(connectionString);
-            Logger.Info("Connecting to SQL Server...");
-            Console.Error.WriteLine("Connecting...");
-            connection.Open();
+            await using SqlConnection connection = new(connectionString);
+            await Console.Error.WriteLineAsync("Connecting...");
+            await connection.OpenAsync(cancellationToken);
+            opened = true;
 
-            using var command = new SqlCommand(sql, connection);
-            command.CommandTimeout = settings.QueryTimeout;
+            await using SqlCommand command = new(sql, connection) { CommandTimeout = queryTimeout };
 
-            Logger.Info($"Executing: {label}");
-            Console.Error.WriteLine("Executing query...");
-            using var reader = command.ExecuteReader();
+            await Console.Error.WriteLineAsync("Executing query...");
+            await using SqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
 
-            Console.Error.WriteLine("Writing CSV...");
-            var rowCount = WriteCsv(reader, tempPath, csvEncoding, includeHeader, settings.CsvSettings);
-
-            File.Move(tempPath, outputPath);
-
-            Logger.Info($"CSV written: {outputPath} ({rowCount} rows)");
-
-            // The written file and its row count are what the run produces; the hints
-            // below are not (docs/rules/cli.md, STREAMS).
-            Console.Error.WriteLine();
-            Console.WriteLine($"Done: {outputPath}");
-            Console.WriteLine($"Rows: {rowCount.ToString("N0", CultureInfo.InvariantCulture)}");
-            Console.Error.WriteLine();
-            Console.Error.WriteLine($"{ApplicationVersion.ApplicationName} --open output");
-            Console.Error.WriteLine($"{ApplicationVersion.ApplicationName} --open \"{outputPath}\"");
-            return 0;
+            await Console.Error.WriteLineAsync("Writing CSV...");
+            return await CsvExport.WriteAsync(reader, csvPath, csvEncoding, includeHeader, csvSettings, cancellationToken);
         }
-        catch (SqlException ex) when (ex.Number == -2)
+        catch (SqlException) when (cancellationToken.IsCancellationRequested)
         {
-            Logger.Error("Query timed out");
-            ConsoleMessages.WriteError("query timed out.");
-            return 1;
+            // The provider reports a cancelled command as a server error.
+            throw new OperationCanceledException(cancellationToken);
+        }
+        catch (SqlException ex) when (opened && ex.Number == QueryTimeoutErrorNumber)
+        {
+            throw new RunFailureException("query timed out.", ex);
         }
         catch (SqlException ex)
         {
-            Logger.Error(ex, "SQL execution failed");
-            ConsoleMessages.WriteError("query execution failed.");
-            return 1;
-        }
-        finally
-        {
-            try
-            {
-                if (File.Exists(tempPath))
-                    File.Delete(tempPath);
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn(ex, $"Failed to delete temporary file: {tempPath}");
-            }
+            throw new RunFailureException("query execution failed.", ex);
         }
     }
 
+    // Decided on the parse tree, never on keywords in the text: T-SQL runs one statement
+    // after another with no separator, so only the parser sees where the SELECT ends
+    // (docs/specs/QueryToCsv.md, QTC-15).
     internal static bool IsSelectOnly(string sql)
     {
-        var stripped = CommentsAndStringsRegex().Replace(sql, " ");
-        return !ProhibitedKeywordsRegex().IsMatch(stripped);
+        TSql170Parser parser = new(initialQuotedIdentifiers: true);
+        using StringReader reader = new(sql);
+        TSqlFragment fragment = parser.Parse(reader, out IList<ParseError> errors);
+
+        if (errors.Count > 0 || fragment is not TSqlScript script)
+            return false;
+
+        if (script.Batches.Count != 1 || script.Batches[0].Statements.Count != 1)
+            return false;
+
+        if (script.Batches[0].Statements[0] is not SelectStatement select || select.Into is not null)
+            return false;
+
+        DisallowedReferenceFinder finder = new();
+        select.Accept(finder);
+        return !finder.Found;
     }
 
-    private static string BuildOutputPath(AppSettings settings, string? baseName)
-        => BuildOutputPath(settings.OutputFolder, baseName, DateTime.Now);
-
-    internal static string BuildOutputPath(string outputDir, string? baseName, DateTime timestampSource)
+    // Collects whether the SELECT reaches outside the connected server or changes its state.
+    private sealed class DisallowedReferenceFinder : TSqlFragmentVisitor
     {
-        var timestamp = timestampSource.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+        internal bool Found { get; private set; }
 
-        var prefix = string.IsNullOrEmpty(baseName) ? timestamp : $"{baseName}_{timestamp}";
+        public override void Visit(OpenRowsetTableReference node) => Found = true;
 
-        var candidate = Path.Combine(outputDir, $"{prefix}.csv");
-        if (!File.Exists(candidate))
-            return candidate;
+        public override void Visit(BulkOpenRowset node) => Found = true;
 
-        for (var i = 2; ; i++)
+        public override void Visit(OpenQueryTableReference node) => Found = true;
+
+        public override void Visit(AdHocTableReference node) => Found = true;
+
+        // NEXT VALUE FOR advances the sequence it reads.
+        public override void Visit(NextValueForExpression node) => Found = true;
+
+        // server.database.schema.object reaches another server.
+        public override void Visit(SchemaObjectName node)
         {
-            candidate = Path.Combine(outputDir, $"{prefix}_{i}.csv");
-            if (!File.Exists(candidate))
-                return candidate;
+            if (node.ServerIdentifier is not null)
+                Found = true;
         }
-    }
-
-    private static int WriteCsv(
-        SqlDataReader reader,
-        string outputPath,
-        Encoding encoding,
-        bool includeHeader,
-        CsvSettings csvSettings)
-    {
-        var newLine = csvSettings.NewLine == "LF" ? "\n" : "\r\n";
-        var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
-        {
-            Delimiter = csvSettings.Delimiter,
-            NewLine = newLine,
-        };
-
-        using var writer = new StreamWriter(outputPath, false, encoding);
-        using var csv = new CsvWriter(writer, csvConfig);
-
-        var fieldCount = reader.FieldCount;
-
-        if (includeHeader)
-        {
-            for (var i = 0; i < fieldCount; i++)
-                csv.WriteField(reader.GetName(i));
-            csv.NextRecord();
-        }
-
-        var rowCount = 0;
-        while (reader.Read())
-        {
-            for (var i = 0; i < fieldCount; i++)
-            {
-                if (reader.IsDBNull(i))
-                {
-                    csv.WriteField(csvSettings.NullValue);
-                }
-                else
-                {
-                    csv.WriteField(FormatValue(reader, i, csvSettings.DateFormat));
-                }
-            }
-            csv.NextRecord();
-            rowCount++;
-        }
-
-        return rowCount;
-    }
-
-    private static string FormatValue(SqlDataReader reader, int ordinal, string? dateFormat)
-    {
-        var type = reader.GetFieldType(ordinal);
-
-        if (type == typeof(DateTime))
-        {
-            var value = reader.GetDateTime(ordinal);
-            return dateFormat is not null
-                ? value.ToString(dateFormat, CultureInfo.InvariantCulture)
-                : value.ToString(CultureInfo.InvariantCulture);
-        }
-
-        if (type == typeof(DateTimeOffset))
-        {
-            var value = reader.GetFieldValue<DateTimeOffset>(ordinal);
-            return dateFormat is not null
-                ? value.ToString(dateFormat, CultureInfo.InvariantCulture)
-                : value.ToString(CultureInfo.InvariantCulture);
-        }
-
-        var rawValue = reader.GetValue(ordinal);
-
-        if (rawValue is IFormattable formattable)
-            return formattable.ToString(null, CultureInfo.InvariantCulture);
-
-        return rawValue.ToString() ?? "";
     }
 }

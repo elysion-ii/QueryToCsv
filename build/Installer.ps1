@@ -45,7 +45,7 @@ $IsccPath = Resolve-IsccPath
 if (-not $IsccPath) {
     Write-Host "   [ERROR] Inno Setup not found" -ForegroundColor Red
     Write-Host "   Searched the uninstall registry, PATH, the .iss file association, and the default install locations" -ForegroundColor Yellow
-    Write-Host "   Install Inno Setup 6 or later from https://jrsoftware.org/isdl.php" -ForegroundColor Yellow
+    Write-Host "   Install Inno Setup 6.3 or later from https://jrsoftware.org/isdl.php" -ForegroundColor Yellow
     exit 1
 }
 Write-Host "Inno Setup: $IsccPath" -ForegroundColor Cyan
@@ -78,7 +78,6 @@ if (Test-Path $ChangelogPath) {
     }
 }
 
-# Create Installer output folder
 $InstallerDir = Join-Path $BuildDir "Installer"
 if (-not (Test-Path $InstallerDir)) {
     New-Item -ItemType Directory -Path $InstallerDir -Force | Out-Null
@@ -86,7 +85,6 @@ if (-not (Test-Path $InstallerDir)) {
 
 Write-Host "`n=== Building QueryToCsv Installer ===" -ForegroundColor Green
 
-# Check if build output exists
 $ExePath = Join-Path $BuildDir "QueryToCsv\QueryToCsv.exe"
 if (-not (Test-Path $ExePath)) {
     Write-Host "   [ERROR] QueryToCsv.exe not found in build\QueryToCsv\" -ForegroundColor Red
@@ -94,7 +92,6 @@ if (-not (Test-Path $ExePath)) {
     exit 1
 }
 
-# Build installer
 Write-Host "Building installer..." -ForegroundColor Cyan
 $SetupScriptPath = Join-Path $BuildDir "Setup_QueryToCsv.iss"
 

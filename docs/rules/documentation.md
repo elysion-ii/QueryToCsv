@@ -1,132 +1,136 @@
 # Documentation
 
-Rules for writing, classifying, placing, naming, and retiring every non-source document
-in a repository — specs, guides, references, ADRs, investigations, notes, and the rest.
-Read this file before implementing any change, as `standard.md` How to use these rules
-directs, and consult it again whenever a task creates, changes, moves, renames,
-archives, or deletes a document, or when it is unclear where a new one belongs. Do not
-classify or name documents from memory.
+Shared rules for every non-source document in the repository (e.g., specifications,
+guides, references, ADRs, investigations, notes, plans, and routing entry files).
+Strictly follow these rules for all document classification, naming, placement,
+writing, and retirement.
 
 ## Principles
 
-- Folders in normal reference paths contain only documents that are currently valid. Retired documents never mix with active ones.
-- Classify by the document's role (rule / decision / procedure / reference / investigation / note), not by the feature it relates to.
-- Active documents live directly under their category folder. Never create `current/` or `active/` subfolders whose only meaning is "not archived" — the sole exceptions are categories where state itself is meaningful (`investigations/`, and `adr/archive/`).
-- Archiving is not deletion: it removes a document from the normal reference path while keeping history. Documents with no future reference value are deleted, not archived.
+- **Valid documents only in active paths**: active category folders (every folder outside `archive/` and `adr/archive/`) hold only currently valid documents; never mix retired documents with active ones.
+- **Classify by role**: organize documents by role (e.g., specification, rule, decision, procedure, reference, investigation, note) rather than by feature area.
+- **Flat active folders**: place active documents directly inside their category folder (or directly under `<App>/` when split per application under `Application Scope`) so readers and agents can discover every active document for a role or application by listing a single directory without guessing ad-hoc topic subfolders; never create `current/` or `active/` subfolders (redundant with `Valid documents only in active paths`) except where lifecycle state itself structures the directory (`investigations/`, `adr/archive/`).
+- **Archive vs delete**: archiving removes obsolete documents with historical traceability from active paths while keeping version-control history; delete documents that carry no future reference value.
 
-## Document responsibilities
+## Document Responsibilities
 
-- `AGENTS.md` holds facts, commands, the Applications table, and reading instructions only — no rule text.
-- `docs/rules/` holds development and change rules that cannot be enforced mechanically.
-- `docs/specs/` states behavior a system must exhibit, observable from outside it.
-- `docs/adr/` records an adopted decision, its reasoning, consequences, rejected alternatives, and revisit conditions.
-- `docs/guides/` records a reproducible working procedure.
-- `docs/references/` records a durable fact consulted during work.
-- `docs/investigations/`, `docs/notes/`, `docs/plans/`, `docs/inbox/`, and `docs/archive/` each have one distinct purpose — see Category notes below; do not blend them.
-- Content that defines a correct input/output pair belongs in test code (table-driven), not in a document.
+- `AGENTS.md`: router holding repository facts, commands, the Applications table, the path of the code map (`Code Map`), and reading instructions — no rule text. A sentence pointing to a rule ("pass the AUDIT gate in `standard.md`") is a reading instruction; a sentence stating an obligation itself ("run tests before committing") is rule text.
+- `docs/rules/`: development and change rules (shared rules, stack rules, and application rules; mechanical tooling enforces what it can, and these files govern the obligations code and documents must uphold).
+- `docs/specs/`: externally observable behavior the system must exhibit.
+- `docs/adr/`: adopted architectural decisions, reasoning, consequences, rejected alternatives, and revisit conditions.
+- `docs/guides/`: reproducible working procedures.
+- `docs/references/`: durable factual knowledge consulted during work.
+- `docs/investigations/`, `docs/notes/`, `docs/plans/`, `docs/inbox/`, and `docs/archive/`: single-purpose roles defined in Category Notes below; never blend them.
+- **Input/output test vectors belong in tests**: place exhaustive input → output specification expectations in table-driven test code rather than prose specifications; human-readable reference mapping tables maintained under `docs/references/` follow `Source of Truth` below.
 
 ## Writing
 
-Applies to the body of every document in this tree.
+Applies to all non-source documents in the repository. Every document must stand on its own for a blank-slate reader who knows nothing of past conversations, earlier versions, or unstated assumptions — two readers reading only the document must reach the same understanding and verdict without guessing.
 
-- **State the what and the why before the how.** Cover the 5W1H the subject actually needs — what, why, who, when, where, how. Which of them matter varies by category; the ones that do are written down rather than left to be inferred from the surrounding text
-- **Re-read a finished draft for means presented as ends.** A document drifts there while it is being written: the mechanism gets named where the property belongs, and a tool or a threshold stands in for the criterion it was chosen to serve. State the property or the criterion first, then the mechanism that currently satisfies it
-- **A number belongs in a document when it is the criterion**, never when it stands in for one. A version, a limit the system enforces, or a default stated together with the condition for departing from it is a criterion; a quantity offered as an illustration of an acceptable cost is not, and it will be read as a threshold it was never meant to be
+- **Current facts and purpose first**: state the current state, current constraints, and *what*/*why* before *how*, omitting change history, avoided alternatives, conversation residue, and filler (change history belongs in version control).
+- **State the property, not a proxy or temporary tool**: state the invariant property or goal to protect before naming any concrete mechanism that satisfies it (specifications omit implementation mechanisms per `Category Notes`), and include numbers only when the number itself is an enforceable criterion (e.g., system limit, protocol threshold, default).
+- **Normative requirements (`docs/rules/`, `docs/specs/`, `docs/adr/`, acceptance criteria)**:
+  - **Checkable criteria and boundaries**: state observable pass/fail conditions (never vague adjectives alone such as "simple" or "clean"), define boundary terms, mark whether a list is illustrative (`e.g.`) or exhaustive (`only`), and state both sides of any conditional permission or exception.
+  - **Include non-obvious reasons**: state why a requirement or prohibition holds inside the requirement itself so a reader facing an edge case preserves its intent rather than guessing or defending wording blindly.
+  - **Explicit interaction on overlaps**: whenever two requirements govern the same artifact or boundary, state how they interact instead of leaving the reader to pick one.
 
-## Directory layout
+### Requirement IDs
+
+- **Every requirement carries an ID**: every specification requirement appears as a heading opening with `<ID>: <statement>` (e.g., `### ORD-1: An order without lines is rejected`). Content under that heading up to the next same- or higher-level heading constitutes that requirement; un-IDed headings only group requirements and state none themselves.
+- **ID syntax**: `<PREFIX>-<number>` where `<PREFIX>` begins with an uppercase ASCII letter and contains only uppercase ASCII letters and digits (e.g., `ORD-1`, `CLI2-14`).
+- **Unique and non-reusable**: each ID uniquely identifies one requirement across the repository's specifications; retired IDs are never reassigned.
+- **Legacy migration**: any older specification lacking requirement IDs assigns IDs to all requirements on the first edit that touches it.
+
+### Procedure Design
+
+Applies to ordered operational procedures written for humans or agents (e.g., `docs/guides/`, release procedures, setup checklists) so an executor unfamiliar with the environment can follow them safely without guessing.
+
+- **Explicit start, context, and confirmation**: state preconditions and goal state upfront, name the exact operational context (e.g., working directory, host, screen, URL) at each step and transition, and give every step — including conditional or failure-recovery branches — concrete actions and an observable confirmation (e.g., "command exits 0") rather than a vague "done".
+- **Order by real dependencies**: sequence steps by prerequisites and verification gates rather than patching broken order with ad-hoc workarounds, using stage headings only when a procedure spans distinct stages.
+- **Separate automation from human gates**: automate repetitive mechanical tasks in scripts or tooling, and explicitly mark irreversible operations and judgment calls as manual confirmation steps.
+
+## Directory Layout
 
 ```text
 AGENTS.md                   router: repository facts, commands, Applications table,
-                            reading instructions — no rule text
+                            code map path, reading instructions — no rule text
 
 docs/
-  rules/                    rule bodies: shared core + task-specific rule files +
-                            language files (managed by dev-standards) + application
-                            rules files
+  rules/                    rule bodies: shared rules + stack rules (managed by
+                            dev-standards) + application rules
   adr/                      active ADRs
     archive/                superseded / rejected / withdrawn ADRs
-  specs/                    specifications: what the system must do
+  specs/                    specifications: externally observable system behavior
   guides/                   reproducible procedures
-  references/               durable project-specific facts
+  references/               durable repository facts
   investigations/
     active/                 ongoing investigations
-    closed/                 finished investigations still worth reading
-  notes/                    lightweight but classified, valid memos
-  plans/                    in-progress work plans (working area, gitignored)
+    closed/                 finished investigations worth keeping
+  notes/                    lightweight, classified valid memos
+  plans/                    in-progress work plans (excluded from version control unless enabled)
   inbox/                    unclassified documents awaiting triage
   archive/                  retired non-ADR documents, mirrored by category
     rules/ specs/ guides/ references/ investigations/ notes/ plans/
 ```
 
-The category set is extensible: a project may add role subfolders (e.g., `docs/design/`)
-when a role clearly fits no existing category and several documents will share it. Every
-added category follows the same rules: active documents directly under the folder,
-retirement into `docs/archive/<category>/`, standard front matter.
+Repositories may add dedicated role subfolders (e.g., `docs/design/`) when multiple documents share a distinct role fitting no standard folder; added categories follow identical placement, archiving, and front-matter rules.
 
-## Application scope
+## Application Scope
 
-Every category shares one scope rule: a document directly under `docs/<category>/` is
-repository-wide; a document at `docs/<category>/<App>.md` or under
-`docs/<category>/<App>/` is specific to that application. The single file and the
-directory are equivalent scope markers — pick per category by file count; shapes may
-differ between categories. Use the same application identifier in every category.
+One scope rule applies across all categories: a document directly under `docs/<category>/` is repository-wide, while a document at `docs/<category>/<App>.md` or under `docs/<category>/<App>/` belongs to that application. Single files and directories are interchangeable per category based on file count, using the exact same application identifier across all categories.
 
-- The identifier is chosen per repository (matching the solution/project name is
-  recommended, not required) and is used **verbatim** — it is exempt from the
-  kebab-case naming rule
-- Application rules (`docs/rules/<App>...`) and the specification
-  (`docs/specs/<App>...`) are a mandatory pair, declared with explicit paths in the
-  `AGENTS.md` Applications table. App-splitting any other category is optional
-- ADR numbering is per directory: `docs/adr/` and `docs/adr/<App>/` hold independent
-  sequences (each scope numbers across its active and archived ADRs). Retired
-  app-scoped ADRs go to `docs/adr/archive/<App>/`
-- When an application is retired, its rules file and specification move to
-  `docs/archive/rules/` and `docs/archive/specs/`; dev-standards-managed files are
-  never archived
+- **Exact application identifier**: choose one identifier per application (matching the project or solution name is recommended, not mandatory) and use it verbatim across filenames and directories, exempt from lowercase kebab-case naming.
+- **Mandatory rules/specs pair**: each application declares its `docs/rules/<App>...` and `docs/specs/<App>...` paths explicitly in the root `AGENTS.md` Applications table; splitting other categories per application is optional.
+- **Independent ADR numbering**: `docs/adr/` and each `docs/adr/<App>/` maintain separate monotonic sequences spanning active and archived ADRs; retired app-scoped ADRs move to `docs/adr/archive/<App>/`.
+- **Retiring an application**: move its authored rules file and specification to `docs/archive/rules/` and `docs/archive/specs/`; never archive dev-standards-managed rule files.
 
-## Placement decision table
+## Placement Decision Table
 
 | Question | Destination |
 |---|---|
-| Is it a development or change rule that cannot be enforced mechanically? | `docs/rules/` — repository/application rules go in the application's rules file; shared core, task-specific rule files, and language files are managed by dev-standards |
-| Is it a repository fact, command, or routing instruction (no rule text)? | Root `AGENTS.md` (or a nested `AGENTS.md` for a subtree) |
-| Does it define correct results (input → output)? | Test code (table-driven) |
-| Does it record why a decision was made? | `docs/adr/` |
-| Does it state what the system must do (a specification)? | `docs/specs/` |
-| Is it a reproducible working procedure? | `docs/guides/` — unless a distributed task-specific rule file already defines it as a generic procedure (see Category notes) |
-| Is it a durable fact referenced during work? | `docs/references/` |
-| Does it record how a specific problem was investigated? | `docs/investigations/` |
-| Valid, but too light for a formal category? | `docs/notes/` |
-| Is it an in-progress work plan? | `docs/plans/` (finished: `docs/archive/plans/`) |
-| Placement not yet decided? | `docs/inbox/` |
-| Retired non-ADR document worth keeping? | `docs/archive/<category>/` |
+| Development or change rule? | `docs/rules/` (repository/application rules in application rules file; shared and stack rules managed by dev-standards) |
+| Repository fact, command, or routing instruction (no rule text)? | Root `AGENTS.md` (or nested `AGENTS.md` for a subtree) |
+| Folder of a feature, or home of a mechanism shared across features? | The code map (`Code Map`) |
+| Exhaustive input → output specification test vectors? | Table-driven test code |
+| Record of an architectural decision and its rationale? | `docs/adr/` |
+| Externally observable system behavior (specification)? | `docs/specs/` |
+| Reproducible working procedure? | `docs/guides/` (excluding generic rules already covered in `docs/rules/`) |
+| Durable reference fact consulted during work? | `docs/references/` |
+| Record of a specific technical investigation? | `docs/investigations/` |
+| Valid, lightweight classified memo? | `docs/notes/` |
+| In-progress work plan? | `docs/plans/` (finished: `docs/archive/plans/` or delete per `Archive vs Delete`) |
+| Placement undecided? | `docs/inbox/` |
+| Retired non-ADR document worth retaining? | `docs/archive/<category>/` |
 | Retired ADR? | `docs/adr/archive/` |
 | No future reference value? | Delete |
 
-## Category notes
+## Category Notes
 
-- **`AGENTS.md` (router)**: repository and application descriptions, technology stack, the Applications table (rules ↔ specification paths), real commands, and reading/AUDIT instructions. No rule text — rule bodies live in `docs/rules/`. Never duplicate a rule across files.
-- **`docs/rules/`**: rule bodies in layers — the shared core (`standard.md`), the subject-specific `documentation.md` and `git.md`, the interface-specific `cli.md` (the one file skippable, and only while the application exposes no command-line interface), and per-stack language files are distributed verbatim by dev-standards (never edit them; retrofit updates them from a pinned tag and reports local edits); application rules files are repository-authored and hold only deltas and overrides against the shared rules. The more specific file wins on conflict.
-- **`docs/specs/`**: states what the system must do — purpose, scope, users and external systems, required behavior, inputs and outputs, error behavior, invariants, non-functional requirements, and what is out of scope. Specifications describe behavior, not implementation: no class structures, libraries, or internal algorithms. Requirement IDs are optional; when present, tests reference them so conformance is verifiable. (The rule that a spec must be updated before implementing behavior it does not yet cover — spec-first — is a development rule and lives in `standard.md`, not here.)
-- **`docs/adr/`**: the adopted decision plus reasoning, constraints, rejected alternatives, and revisit conditions. Body sections (Nygard-style): Context, Decision, Consequences (required); Alternatives considered, Revisit when (when they exist). A superseded ADR names its successor in front matter (`superseded-by`); an ADR stays an ADR — retired ones go to `docs/adr/archive/`, never `docs/archive/`.
-- **`docs/guides/`**: repository- or application-specific reproducible procedures. Exception: a generic procedure that a distributed task-specific rule file already defines (e.g., the `gh pr merge` procedure in `git.md`) is not duplicated here — the rule file is the sole source for that procedure. `docs/guides/` holds only what the rule files do not already cover, including a procedure that layers repository-specific decisions on top of one (e.g., a release guide that adds this repository's own release/tag decision on top of the generic Git procedure).
-- **`docs/references/`**: durable facts that are hard to read from source alone: external API constraints, auth flows, data mappings, legacy caveats, domain vocabulary. Current-state architecture/design descriptions default here; promote to a dedicated category when numerous.
-- **`docs/investigations/`**: state matters — `active/` (ongoing) vs `closed/` (finished, still worth reading; not an archive). When finished, promote durable outcomes: rules → `docs/rules/` (the application rules file), decisions → `docs/adr/`, procedures → `docs/guides/`, facts → `docs/references/`.
-- **`docs/notes/` vs `docs/inbox/`**: the line is whether the placement decision has been made — `inbox` holds unclassified documents; `notes` holds documents decided to be lightweight-but-valid. Putting something in `notes` "for now" means it belongs in `inbox`. Promote a note to `references/` when it becomes the authoritative answer you would point someone to.
-- **`docs/plans/`**: working area, gitignored and local-only by default (as is `docs/archive/plans/`) — plans stay out of the repository, in progress or archived, unless a project rule deliberately tracks them. In projects that do track plans, clean `docs/plans/` before committing (move finished plans to `docs/archive/plans/`, renaming on collision).
+- **`AGENTS.md` (router)**: holds descriptions, technology stack, Applications table, real commands, the code map path, and reading/AUDIT instructions — zero rule bodies. Never duplicate rule text across `AGENTS.md` and `docs/rules/`.
+- **`docs/rules/`**: holds rule bodies across the three tiers defined in `standard.md` (Application rules > Stack rules > Shared rules). Never duplicate rules across files.
+- **`docs/specs/`**: specifies externally observable system behavior (e.g., purpose, scope, users and external systems, required behavior, inputs/outputs, error behavior, invariants, non-functional requirements, out of scope — including whichever sections apply to the system) with zero implementation details (no internal classes, libraries, or algorithms). Every requirement carries an ID verified by tests (`testing.md` Requirement Coverage), and decision completeness follows `specs.md`.
+- **`docs/adr/`**: records adopted decisions in Nygard structure (`Context`, `Decision`, `Consequences` required; `Alternatives considered`, `Revisit when` when applicable). Superseded ADRs name their successor in `superseded-by` and move to `docs/adr/archive/`, never `docs/archive/`.
+- **`docs/guides/`**: holds repository- or application-specific reproducible procedures. Do not duplicate generic procedures already established in shared rule files or external tool documentation; include only repository-specific steps or repository decisions layered atop a shared standard.
+- **`docs/references/`**: holds durable facts hard to recover from source alone (e.g., external protocol quirks, auth flows, data mappings, legacy constraints, domain glossary, architecture overviews).
+- **`docs/investigations/`**: separates ongoing work (`active/`) from finished reference value (`closed/`, distinct from archive). Promote durable findings on completion: rules → `docs/rules/`, decisions → `docs/adr/`, procedures → `docs/guides/`, facts → `docs/references/`.
+- **`docs/notes/` vs `docs/inbox/`**: `inbox/` holds items awaiting classification; `notes/` holds intentionally lightweight valid documents. Placing a document "for now" signals `inbox/`; promote authoritative answers to `references/`.
+- **`docs/plans/`**: working area excluded from version control alongside `docs/archive/plans/` unless an explicit application rule under `docs/rules/` enables tracking plans. Repositories tracking plans move completed plans worth retaining to `docs/archive/plans/` (renaming on collision) before committing, or delete completed plans with no retention value per `Archive vs Delete`.
 
-## Front matter
+## Code Map
 
-Every document carries front matter with at least `created` and `status`. The
-exemptions are: repository-root entry files (`README.md`, `CHANGELOG.md`), which face
-external readers and tooling that expect them to open with their content;
-in-progress plans under `docs/plans/` (front matter is added when archived);
-ADRs, which do **not** carry `created` — the sequence number and git history already
-encode chronology, so ADR front matter is `status` only, plus `supersedes`/`superseded-by`
-when applicable (never add `created` to an ADR); and dev-standards-managed files under
-`docs/rules/`, which carry no front matter — they are distributed verbatim and
-version-managed by the pinned dev-standards tag (repository-authored rules files carry
-standard front matter).
+The code map tells where code lives, so that code holding the same knowledge is found before new code is written (`standard.md` One Home per Piece of Knowledge).
+
+- **Location**: `docs/references/code-map.md`; in a multi-application repository, `docs/references/<App>/code-map.md` for each application (`Application Scope`). `AGENTS.md` names its path and holds no copy of its content.
+- **Content**: one line for each feature folder and for each home of a mechanism shared across features (e.g., database connection, logging, configuration loading, test infrastructure), giving its path and the knowledge it holds. It lists folders and homes, not individual types, so adding a type inside an existing folder leaves it unchanged.
+
+## Front Matter
+
+Front matter embeds lifecycle state and authoring date inside each file so readers, full-text searches, and moved or copied files show whether a document is current without inspecting directory trees or querying version-control history (which can obscure original authoring dates across renames or squashes). Every document carries YAML front matter with at least `created` and `status`, with four explicit exemptions:
+
+1. Repository-root entry files (e.g., `README.md`, `CHANGELOG.md`, `CLAUDE.md`) and agent routing files (`AGENTS.md`, both repository-root and nested) read directly by external tools or agent harnesses expecting immediate Markdown headings.
+2. In-progress plans under `docs/plans/` (front matter added only when archived).
+3. ADRs, which omit `created` (their append-only `NNNN` sequence already shows decision order in the filename, with commit history available for exact dates) and carry only `status` plus `supersedes`/`superseded-by` when applicable.
+4. Managed files under `docs/rules/` distributed verbatim from dev-standards (repository-authored application rules files carry standard front matter).
 
 ```yaml
 ---
@@ -135,7 +139,7 @@ created: 2026-07-15
 ---
 ```
 
-### `status` vocabulary
+### `status` Vocabulary
 
 | Document type | Allowed values |
 |---|---|
@@ -143,36 +147,31 @@ created: 2026-07-15
 | Investigation | `active` / `closed` / `archived` |
 | Everything else | `active` / `archived` |
 
-Do not invent other values. Optional fields: `last-reviewed`, `topics`,
-`supersedes` / `superseded-by`.
+Do not invent unlisted status values — a fixed vocabulary keeps lifecycle state consistent across searches and tooling without synonymous drift (e.g., `deprecated` vs `obsolete`) and distinguishes `superseded`, `rejected`, and `withdrawn` ADRs inside `docs/adr/archive/`. Permitted optional fields (only these, keeping metadata keys uniform across documents and searches rather than fragmenting across synonyms such as `tags` vs `topics`; ADRs carry only `supersedes` and `superseded-by` per Exemption 3 above): `last-reviewed`, `topics`, `supersedes`, `superseded-by`.
 
 ## Naming
 
-- Lowercase kebab-case describing the content: `database-migration.md`, `authentication-flow.md`.
-- **Application identifiers are exempt**: `<App>.md` files and `<App>/` directories use the identifier verbatim, exactly as declared in the `AGENTS.md` Applications table (see Application scope).
-- Never content-free names: `memo.md`, `temp.md`, `note1.md`, `misc.md`.
-- No sequential numbering for general documents (`0001-`) — chronology belongs in `git log`.
-- **ADRs are the exception**, following the community convention: `NNNN-description.md` with a 4-digit zero-padded number. Numbers are immutable IDs allocated append-only: next = highest existing number across `docs/adr/` **and** `docs/adr/archive/` + 1. Never renumber and never fill gaps.
-- Infrastructure directories are lowercase (`docs/`, `adr/`, `guides/`); code directories follow the language convention.
+- **Lowercase kebab-case**: name general documents descriptively in lowercase kebab-case (e.g., `database-migration.md`, `authentication-flow.md`) to avoid spaces that break shell commands and Markdown links, prevent case-collision bugs between Windows/macOS and Linux filesystems, and keep filenames uniform across searches rather than mixing `snake_case`, `camelCase`, and hyphens; never use content-free names (e.g., `memo.md`, `temp.md`, `note1.md`, `misc.md`).
+- **Application identifiers exempt**: `<App>.md` files and `<App>/` directories preserve the exact casing declared in `AGENTS.md`.
+- **No sequential numbers for general docs**: do not prefix general filenames with sequential numbers (`0001-`), which create merge-conflict numbering collisions and clutter titles — use `created` front matter and version-control history for chronology instead (ADRs are the sole exception).
+- **ADR sequential IDs**: format ADRs as `NNNN-description.md` using append-only 4-digit zero-padded numbers (`max(docs/adr/, docs/adr/archive/) + 1` per directory scope); never renumber or backfill gaps.
+- **Directory casing**: keep documentation infrastructure folders lowercase (`docs/`, `adr/`, `guides/`) so fixed documentation paths resolve identically across case-sensitive and case-insensitive filesystems and automation; source-code folders follow the stack's naming convention.
 
 ## Lifecycle
 
 ```text
-inbox → (rules | adr | specs | guides | references | investigations | notes) → archive → delete when worthless
-investigations: active → closed → archive/investigations
-adr:            adr/ → adr/archive/
-plans:          docs/plans/ → docs/archive/plans/ (or delete)
+general:        (inbox →) active category (non-ADR, non-investigation) → docs/archive/<category>/
+investigations: (inbox →) active → closed → docs/archive/investigations/
+adr:            (inbox →) docs/adr/ → docs/adr/archive/
+plans:          docs/plans/ → docs/archive/plans/
 ```
 
-## Archive vs delete
+Move retained documents only along one arrow at a time (`inbox/` is optional when the category is already known; finished investigations worth reading move to `closed/`, never straight to `docs/archive/investigations/`). Retire documents from active paths as soon as they are superseded or describe obsolete system behavior. Documents meeting the deletion criteria in `Archive vs Delete` may be deleted directly from any stage (including `inbox/`, active folders, `plans/`, and archive folders) without passing through an archive folder first.
 
-Archive when the document is invalid or replaced but still traces past incidents or
-decision background. Delete when it is duplicated, a spent temporary memo, wrong with no
-historical value, or fully covered by Git history.
+## Archive vs Delete
 
-## Source of truth
+Archive documents that are no longer valid when their historical context helps trace past incidents or decision rationale. Delete duplicates, spent temporary memos, factually wrong notes with no historical value, emptied behavior ledgers (`specs.md` Ledgers), or documents wholly superseded by version-control history (e.g., finished plans with no retention value).
 
-When a human-readable reference (e.g., a mapping table) coexists with tests, declare the
-source of truth in the document itself. Precedence: table-driven tests > reference
-document > current code. Snapshot tests only detect change; they are never a source of
-truth.
+## Source of Truth
+
+When a human-readable reference document (e.g., a mapping table in `docs/references/`) coexists with automated tests, declare the source of truth in the document itself. Precedence: table-driven tests > reference document > current code. Behavior ledgers (`specs.md` Ledgers) record implementation facts, not intended behavior, and are not reference documents under this precedence. Snapshot tests detect unintended change only and are never a source of truth.

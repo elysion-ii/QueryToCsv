@@ -1,0 +1,8 @@
+// APIs no code in the repository may call. Every use is RS0030, a build error that no
+// suppression exempts (see docs/rules/dotnet.md, ANALYZERS).
+// Each line: <documentation comment ID>;<message naming what to use instead>
+
+// FILEPATH: both resolve against the working directory, which changes with how the
+// application is launched
+M:System.IO.Directory.GetCurrentDirectory;Anchor paths explicitly via AppContext.BaseDirectory or Environment.GetFolderPath (see docs/rules/dotnet.md, FILEPATH)
+P:System.Environment.CurrentDirectory;Anchor paths explicitly via AppContext.BaseDirectory or Environment.GetFolderPath (see docs/rules/dotnet.md, FILEPATH)

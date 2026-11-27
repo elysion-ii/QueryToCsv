@@ -1,35 +1,22 @@
 using System.Globalization;
 using System.Text;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 
 namespace QueryToCsv;
 
-public class ConnectionEntry
+internal sealed class AppSettings
 {
-    public string Name { get; set; } = "";
-    public string ConnectionString { get; set; } = "";
-}
+    internal const string FileName = "appsettings.json";
+    internal const string DefaultQueryFolderName = "queries";
+    internal const string DefaultOutputFolderName = "output";
+    internal const string DefaultSqlFileEncoding = "UTF-8";
+    internal const int DefaultQueryTimeout = 30;
+    internal const int DefaultLogRetentionDays = 30;
 
-public class CsvSettings
-{
-    public const string DefaultDelimiter = ",";
-    public const string DefaultNullValue = "";
-    public const string DefaultNewLine = "CRLF";
-
-    public string Delimiter { get; set; } = DefaultDelimiter;
-    public string NullValue { get; set; } = DefaultNullValue;
-    public string NewLine { get; set; } = DefaultNewLine;
-    public string? DateFormat { get; set; }
-}
-
-public class AppSettings
-{
-    public const string FileName = "appsettings.json";
-    public const string DefaultQueryFolderName = "queries";
-    public const string DefaultOutputFolderName = "output";
-    public const string DefaultSqlFileEncoding = "UTF-8";
-    public const int DefaultQueryTimeout = 30;
-    public const int DefaultLogRetentionDays = 30;
+    // Ten years: retention stays a bounded window, and the oldest kept date stays far
+    // inside the calendar range (docs/specs/QueryToCsv.md, QTC-6).
+    internal const int MaxLogRetentionDays = 3650;
 
     private const string QueryFolderKey = "QueryFolder";
     private const string OutputFolderKey = "OutputFolder";
@@ -41,20 +28,20 @@ public class AppSettings
     private const string NewLineKey = "CsvSettings:NewLine";
     private const string DateFormatKey = "CsvSettings:DateFormat";
 
-    public List<ConnectionEntry> Connections { get; set; } = [];
-    public string QueryFolder { get; set; } = "";
-    public string OutputFolder { get; set; } = "";
-    public int QueryTimeout { get; set; } = DefaultQueryTimeout;
-    public string SqlFileEncoding { get; set; } = DefaultSqlFileEncoding;
-    public int LogRetentionDays { get; set; } = DefaultLogRetentionDays;
-    public CsvSettings CsvSettings { get; set; } = new();
+    internal IReadOnlyList<ConnectionEntry> Connections { get; init; } = [];
+    internal string QueryFolder { get; init; } = "";
+    internal string OutputFolder { get; init; } = "";
+    internal int QueryTimeout { get; init; } = DefaultQueryTimeout;
+    internal string SqlFileEncoding { get; init; } = DefaultSqlFileEncoding;
+    internal int LogRetentionDays { get; init; } = DefaultLogRetentionDays;
+    internal CsvSettings CsvSettings { get; init; } = new();
 
     // Returns the settings to run on, plus one notice per configured value that was
     // rejected. A missing or unreadable file is itself a notice, never a failure
-    // (docs/rules/standard.md, Configuration Values).
-    public static (AppSettings Settings, IReadOnlyList<string> Notices) Load()
+    // (docs/rules/configuration.md, Configuration Values).
+    internal static (AppSettings Settings, IReadOnlyList<string> Notices) Load()
     {
-        var baseDirectory = AppContext.BaseDirectory;
+        string baseDirectory = AppContext.BaseDirectory;
 
         if (!File.Exists(Path.Combine(baseDirectory, FileName)))
         {
@@ -83,8 +70,7 @@ public class AppSettings
         IConfiguration config,
         string baseDirectory)
     {
-        var notices = new List<string>();
-        var settings = Defaults(baseDirectory);
+        List<string> notices = [];
 
         T Accept<T>((T Value, string? Notice) resolved)
         {
@@ -94,45 +80,107 @@ public class AppSettings
             return resolved.Value;
         }
 
-        settings.Connections = config.GetSection("Connections").GetChildren()
-            .Select(entry => new ConnectionEntry
+        // Members initialize in the order written, which is the order notices are reported in.
+        AppSettings settings = new()
+        {
+            Connections =
+            [
+                .. config.GetSection("Connections").GetChildren()
+                    .Select(entry => new ConnectionEntry
+                    {
+                        Name = entry["Name"] ?? "",
+                        ConnectionString = entry["ConnectionString"] ?? "",
+                        Credential = entry["Credential"],
+                    }),
+            ],
+            QueryFolder = Accept(ResolveFolder(
+                config, QueryFolderKey, Path.Combine(baseDirectory, DefaultQueryFolderName), baseDirectory, mustExist: true)),
+            OutputFolder = Accept(ResolveFolder(
+                config, OutputFolderKey, Path.Combine(baseDirectory, DefaultOutputFolderName), baseDirectory, mustExist: false)),
+            QueryTimeout = Accept(ResolveWholeNumber(config, QueryTimeoutKey, DefaultQueryTimeout, int.MaxValue)),
+            LogRetentionDays = Accept(ResolveWholeNumber(config, LogRetentionDaysKey, DefaultLogRetentionDays, MaxLogRetentionDays)),
+            SqlFileEncoding = Accept(ResolveEncodingName(config, SqlFileEncodingKey)),
+            CsvSettings = new CsvSettings
             {
-                Name = entry["Name"] ?? "",
-                ConnectionString = entry["ConnectionString"] ?? "",
-            })
-            .ToList();
-
-        settings.QueryFolder = Accept(ResolveFolder(
-            config, QueryFolderKey, Path.Combine(baseDirectory, DefaultQueryFolderName), baseDirectory, mustExist: true));
-        settings.OutputFolder = Accept(ResolveFolder(
-            config, OutputFolderKey, Path.Combine(baseDirectory, DefaultOutputFolderName), baseDirectory, mustExist: false));
-        settings.QueryTimeout = Accept(ResolvePositiveNumber(config, QueryTimeoutKey, DefaultQueryTimeout));
-        settings.LogRetentionDays = Accept(ResolvePositiveNumber(config, LogRetentionDaysKey, DefaultLogRetentionDays));
-        settings.SqlFileEncoding = Accept(ResolveEncodingName(config, SqlFileEncodingKey));
-        settings.CsvSettings.Delimiter = Accept(ResolveDelimiter(config, DelimiterKey));
-        settings.CsvSettings.NullValue = config[NullValueKey] ?? CsvSettings.DefaultNullValue;
-        settings.CsvSettings.NewLine = Accept(ResolveNewLine(config, NewLineKey));
-        settings.CsvSettings.DateFormat = Accept(ResolveDateFormat(config, DateFormatKey));
+                Delimiter = Accept(ResolveDelimiter(config, DelimiterKey)),
+                NullValue = config[NullValueKey] ?? CsvSettings.DefaultNullValue,
+                NewLine = Accept(ResolveNewLine(config, NewLineKey)),
+                DateFormat = Accept(ResolveDateFormat(config, DateFormatKey)),
+            },
+        };
 
         return (settings, notices);
     }
 
-    // The reason the configuration cannot be used, or null when it can. Connections is
-    // required input rather than a defaulted value: no built-in value can name the
-    // server an operator means to query (docs/rules/QueryToCsv.md, Required Input).
-    public string? ValidationError()
+    // The first reason the configuration cannot be used, or null when it can, checked in
+    // entry order. Connections is required input rather than a defaulted value: no
+    // built-in value can name the server an operator means to query
+    // (docs/rules/QueryToCsv.md, Required Input; docs/specs/QueryToCsv.md, QTC-7).
+    internal string? ValidationError()
     {
         if (Connections.Count == 0)
             return "Connections must contain at least one entry.";
 
-        for (var i = 0; i < Connections.Count; i++)
+        for (int i = 0; i < Connections.Count; i++)
         {
-            if (string.IsNullOrWhiteSpace(Connections[i].Name))
-                return $"Connections[{i}].Name is required.";
-
-            if (string.IsNullOrWhiteSpace(Connections[i].ConnectionString))
-                return $"Connections[{i}].ConnectionString is required.";
+            string? error = ConnectionError(Connections[i], i);
+            if (error is not null)
+                return error;
         }
+
+        return null;
+    }
+
+    private string? ConnectionError(ConnectionEntry entry, int index)
+    {
+        string prefix = $"Connections[{index}]";
+
+        if (string.IsNullOrWhiteSpace(entry.Name))
+            return $"{prefix}.Name is required.";
+
+        for (int earlier = 0; earlier < index; earlier++)
+        {
+            if (string.Equals(Connections[earlier].Name, entry.Name, StringComparison.OrdinalIgnoreCase))
+                return $"{prefix}.Name \"{entry.Name}\" is already used by Connections[{earlier}].";
+        }
+
+        if (string.IsNullOrWhiteSpace(entry.ConnectionString))
+            return $"{prefix}.ConnectionString is required.";
+
+        SqlConnectionStringBuilder builder;
+        try
+        {
+            builder = new SqlConnectionStringBuilder(entry.ConnectionString);
+        }
+        catch (Exception ex) when (ex is ArgumentException or FormatException or KeyNotFoundException)
+        {
+            return $"{prefix}.ConnectionString is not a valid connection string.";
+        }
+
+        // A connection that accepts any certificate, or none, can be read and altered on
+        // the way (docs/rules/db.md, Encrypted connections verify the server).
+        if (builder.TrustServerCertificate)
+        {
+            return $"{prefix}.ConnectionString must not set TrustServerCertificate; give the server a certificate "
+                + "the client trusts, or pin it with \"Server Certificate\".";
+        }
+
+        if (SqlConnectionEncryptOption.Optional.Equals(builder.Encrypt))
+            return $"{prefix}.ConnectionString must not turn encryption off.";
+
+        // A password in a plain-text file can be read by anyone who can read the folder
+        // (docs/rules/security.md, Store secrets in platform secret stores).
+        if (builder.Password.Length > 0)
+        {
+            return $"{prefix}.ConnectionString must not contain a password; store it in Windows Credential Manager "
+                + $"and name it in {prefix}.Credential.";
+        }
+
+        if (builder.UserID.Length > 0)
+            return $"{prefix}.ConnectionString must not contain a user name; it comes from {prefix}.Credential.";
+
+        if (entry.Credential is not null && string.IsNullOrWhiteSpace(entry.Credential))
+            return $"{prefix}.Credential is blank.";
 
         return null;
     }
@@ -153,7 +201,7 @@ public class AppSettings
         string baseDirectory,
         bool mustExist)
     {
-        var raw = config[key];
+        string? raw = config[key];
         if (raw is null)
             return (fallback, null);
 
@@ -176,21 +224,22 @@ public class AppSettings
         return (resolved, null);
     }
 
-    private static (int Value, string? Notice) ResolvePositiveNumber(IConfiguration config, string key, int fallback)
+    private static (int Value, string? Notice) ResolveWholeNumber(IConfiguration config, string key, int fallback, int max)
     {
-        var raw = config[key];
+        string? raw = config[key];
         if (raw is null)
             return (fallback, null);
 
-        if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value > 0)
+        if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) && value >= 1 && value <= max)
             return (value, null);
 
-        return (fallback, $"{DisplayKey(key)} \"{raw}\" is not a whole number greater than 0; using {fallback}.");
+        string range = max.ToString(CultureInfo.InvariantCulture);
+        return (fallback, $"{DisplayKey(key)} \"{raw}\" is not a whole number from 1 to {range}; using {fallback}.");
     }
 
     private static (string Value, string? Notice) ResolveEncodingName(IConfiguration config, string key)
     {
-        var raw = config[key];
+        string? raw = config[key];
         if (raw is null)
             return (DefaultSqlFileEncoding, null);
 
@@ -208,20 +257,23 @@ public class AppSettings
 
     private static (string Value, string? Notice) ResolveDelimiter(IConfiguration config, string key)
     {
-        var raw = config[key];
+        string? raw = config[key];
         if (raw is null)
             return (CsvSettings.DefaultDelimiter, null);
 
-        if (raw.Length == 1)
+        // A double quote, a line break, and a space already mean something in CSV quoting,
+        // or are trimmed by readers (docs/specs/QueryToCsv.md, QTC-6).
+        if (raw.Length == 1 && raw[0] is not ('"' or '\r' or '\n' or ' '))
             return (raw, null);
 
         return (CsvSettings.DefaultDelimiter,
-            $"{DisplayKey(key)} \"{raw}\" is not exactly one character; using \"{CsvSettings.DefaultDelimiter}\".");
+            $"{DisplayKey(key)} \"{raw}\" is not one character other than a double quote, a line break, or a space; "
+            + $"using \"{CsvSettings.DefaultDelimiter}\".");
     }
 
     private static (string Value, string? Notice) ResolveNewLine(IConfiguration config, string key)
     {
-        var raw = config[key];
+        string? raw = config[key];
         if (raw is null)
             return (CsvSettings.DefaultNewLine, null);
 
@@ -234,7 +286,7 @@ public class AppSettings
 
     private static (string? Value, string? Notice) ResolveDateFormat(IConfiguration config, string key)
     {
-        var raw = config[key];
+        string? raw = config[key];
         if (raw is null)
             return (null, null);
 
@@ -246,7 +298,7 @@ public class AppSettings
         catch (FormatException)
         {
             return (null,
-                $"{DisplayKey(key)} \"{raw}\" is not a usable date format; dates use the invariant-culture default.");
+                $"{DisplayKey(key)} \"{raw}\" is not a usable date format; dates use the ISO 8601 default.");
         }
     }
 

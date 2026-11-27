@@ -12,5 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\QueryToCsv\QueryToCsv.csproj" />
+    <ProjectReference Include="..\QueryToCsv.TestSupport\QueryToCsv.TestSupport.csproj" />
   </ItemGroup>
 </Project>

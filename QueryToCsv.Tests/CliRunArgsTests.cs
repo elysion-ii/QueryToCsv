@@ -14,6 +14,13 @@ public class CliRunArgsTests
         { ["--file"], "option '--file' requires a value." },
         { ["-e"], "option '-e' requires a value." },
         { ["--query", "SELECT 1", "-e"], "option '-e' requires a value." },
+        // An empty value names nothing
+        { ["-c", "", "--query", "SELECT 1"], "option '-c' requires a value." },
+        { ["--query", ""], "option '--query' requires a value." },
+        { ["--query="], "option '--query' requires a value." },
+        { ["-f", ""], "option '-f' requires a value." },
+        { ["--file="], "option '--file' requires a value." },
+        { ["--query", "SELECT 1", "--encoding="], "option '--encoding' requires a value." },
         { ["--no-header"], "either '--query' or '--file' is required when using one-liner options." },
         { ["-c", "Dev Server"], "either '--query' or '--file' is required when using one-liner options." },
         {
@@ -23,23 +30,33 @@ public class CliRunArgsTests
         { ["-q"], "unknown option '-q'" },
         { ["--verbose"], "unknown option '--verbose'" },
         { ["--query", "SELECT 1", "--csv"], "unknown option '--csv'" },
+        { ["-cDev", "--query", "SELECT 1"], "unknown option '-cDev'" },
         { ["--header=true"], "option '--header' does not accept a value." },
+        { ["--no-header=1"], "option '--no-header' does not accept a value." },
         { ["--query", "SELECT 1", "--", "--no-header"], "unexpected argument '--no-header'" },
     };
 
     // args -> connection, inline query, sql file, encoding, include header
     public static TheoryData<string[], string?, string?, string?, string, bool> AcceptedArgs() => new()
     {
-        { ["--query", "SELECT * FROM Users"], null, "SELECT * FROM Users", null, "utf-8", true },
-        { ["-f", "sales_report.sql"], null, null, "sales_report.sql", "utf-8", true },
+        // One query source, everything else defaulted
         { ["--query", "SELECT 1"], null, "SELECT 1", null, "utf-8", true },
         { ["--query=SELECT 1"], null, "SELECT 1", null, "utf-8", true },
+        { ["--query=SELECT a = 1"], null, "SELECT a = 1", null, "utf-8", true },
         { ["--file", "a.sql"], null, null, "a.sql", "utf-8", true },
         { ["--file=a.sql"], null, null, "a.sql", "utf-8", true },
+        { ["-f", "sales_report.sql"], null, null, "sales_report.sql", "utf-8", true },
+        { ["--query", "SELECT 1", "--"], null, "SELECT 1", null, "utf-8", true },
+        // Header flags: the last one wins
         { ["--query", "SELECT 1", "--header"], null, "SELECT 1", null, "utf-8", true },
         { ["--query", "SELECT 1", "--no-header"], null, "SELECT 1", null, "utf-8", false },
         { ["--query", "SELECT 1", "--no-header", "--header"], null, "SELECT 1", null, "utf-8", true },
         { ["--query", "SELECT 1", "--header", "--no-header"], null, "SELECT 1", null, "utf-8", false },
+        // Value options: the last occurrence wins
+        { ["-c", "A", "-c", "B", "--query", "SELECT 1"], "B", "SELECT 1", null, "utf-8", true },
+        { ["--query", "SELECT 1", "--query", "SELECT 2"], null, "SELECT 2", null, "utf-8", true },
+        { ["--query", "SELECT 1", "-e", "utf-16", "-e", "shift-jis"], null, "SELECT 1", null, "shift-jis", true },
+        // Connection and encoding, in every spelling
         { ["-c", "Dev Server", "--query", "SELECT 1"], "Dev Server", "SELECT 1", null, "utf-8", true },
         { ["--connection=Prod", "--file=a.sql", "--encoding=utf-16"], "Prod", null, "a.sql", "utf-16", true },
         { ["--connection", "Prod", "-f", "a.sql", "--encoding", "utf-16"], "Prod", null, "a.sql", "utf-16", true },
@@ -53,9 +70,10 @@ public class CliRunArgsTests
 
     [Theory]
     [MemberData(nameof(RejectedArgs))]
-    public void Parse_InvalidArgs_ReturnsExpectedError(string[] args, string expectedError)
+    [Trait("Requirement", "QTC-9")]
+    internal void Parse_InvalidArgs_ReturnsExpectedError(string[] args, string expectedError)
     {
-        var (runArgs, error) = CliRunArgs.Parse(args);
+        (CliRunArgs? runArgs, string? error) = CliRunArgs.Parse(args);
 
         Assert.Null(runArgs);
         Assert.Equal(expectedError, error);
@@ -63,7 +81,8 @@ public class CliRunArgsTests
 
     [Theory]
     [MemberData(nameof(AcceptedArgs))]
-    public void Parse_ValidArgs_ReturnsExpectedRunArgs(
+    [Trait("Requirement", "QTC-9")]
+    internal void Parse_ValidArgs_ReturnsExpectedRunArgs(
         string[] args,
         string? expectedConnection,
         string? expectedInlineQuery,
@@ -71,7 +90,7 @@ public class CliRunArgsTests
         string expectedEncoding,
         bool expectedIncludeHeader)
     {
-        var (runArgs, error) = CliRunArgs.Parse(args);
+        (CliRunArgs? runArgs, string? error) = CliRunArgs.Parse(args);
 
         Assert.Null(error);
         Assert.NotNull(runArgs);

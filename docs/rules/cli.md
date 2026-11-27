@@ -1,219 +1,96 @@
 # CLI Standards
 
-Rules for the command-line interface of an application: option and subcommand naming
-and syntax, help, output streams, exit codes, configuration precedence, and version
-output. Read together with `standard.md` whenever the application being changed exposes
-a command-line interface — a console application, or a GUI application that accepts
-command-line options. The rules are stack-agnostic; the baseline is GNU-style options
-plus subcommands.
+**Applies when** the application exposes a command-line interface to users or scripts — a console application, or a GUI or background application that accepts command-line options. Does not apply to reusable libraries, or to applications whose host framework parses internal runtime arguments without exposing user- or script-facing CLI options or commands.
 
-This file is **not a list of features to implement**. It is the naming and syntax
-standard to follow when adding an option or a subcommand. Except for the mandatory
-`--version`, implement an option only when the application provides the corresponding
-feature.
+Defines the stack-agnostic ideals for command structure, option and subcommand naming,
+help output, stream separation, exit codes, error reporting, configuration precedence,
+and version flags, based on GNU-style long options and subcommands. This file defines
+standards for CLI capabilities when present rather than requiring unrequested features;
+only `--version` / `-V` is mandatory on every CLI application.
 
-## Enforcement matrix
+## Command Structure
 
-No rule in this file has a mechanical guard: every rule is an **AUDIT** item. A project
-scaffold may seed compliant defaults (e.g., a console entry point that already
-implements `--help` and `--version`), but nothing prevents their removal — AUDIT still
-checks them.
+- **Consistent invocation order**: accept commands in the order `app [global-options] <command> [command-options] [arguments]`, placing global options directly after the program name, subcommand options after the subcommand name, and positional targets (e.g., file paths) last, keeping global flags unambiguously separated from subcommand flags and target arguments.
 
-| ID | Rule | Mechanism | Check |
-|----|------|-----------|-------|
-| SYNTAX | `app [global-options] <command> [command-options] [arguments]` | — | AUDIT |
-| OPTIONS | Long form for every option; short forms only for frequent options | — | AUDIT |
-| RESERVED | `--version`/`-V` is mandatory; `--help`/`-h`, `-v`, `-q` are reserved names | — | AUDIT — scaffolds may seed the implementation; nothing guards its removal |
-| VERSIONOUT | `--version` prints `<AppName> X.Y.Z` — bare version, no build metadata | The stack's version-management rules keep the source value clean (e.g., `dotnet.md` VERSION) | AUDIT |
-| SUBCOMMANDS | Subcommand structure, naming, and cross-command consistency | — | AUDIT |
-| HELP | Help content and per-level `--help` | — | AUDIT |
-| STREAMS | Results to stdout; logs, progress, warnings, and errors to stderr | — | AUDIT |
-| EXITCODES | 0 success / 1 runtime error / 2 usage error | — | AUDIT |
-| ERRORMSG | `app: <message>` on stderr, with a `--help` hint on usage errors | — | AUDIT |
-| CONFIG | Precedence: options > environment variables > config file > built-in defaults | — | AUDIT |
-| COMPAT | Avoid incompatible changes; a warranted rename replaces the old name outright | — | AUDIT |
+## Option Form
 
-## SYNTAX: Command Structure
+- **Canonical long options**: give every option a lowercase hyphen-separated long form (`--name`, e.g., `--dry-run`) without uppercase letters or underscores, accepting both `--output file.txt` and `--output=file.txt`, keeping scripts self-documenting and consistent with GNU-style option parsing.
+- **Single option prefix style**: accept only `--name` and `-x` option forms; do not accept platform-specific prefixes such as `/silent`, which collide with POSIX absolute paths across cross-platform shells.
+- **Short forms only for frequent options**: assign single-letter short forms (`-x`) only to routinely typed options, supporting bundling for valueless flags (`-abc`) and space-separated values (`-o file.txt`), conserving the finite single-letter flag space for common operations.
+- **End-of-options separator**: treat all tokens following `--` strictly as positional arguments without further option parsing so filenames or values starting with `-` can be passed unambiguously.
 
-Commands follow this structure:
+## Reserved and Conventional Options
 
-```
-app [global-options] <command> [command-options] [arguments]
-```
+The table below reserves option names: when the corresponding feature exists, use its reserved name and short form. Only `--version` (`-V`) is mandatory; other entries apply only when their feature is implemented.
 
-- Global options go immediately after the command name
-- Subcommand-specific options go after the subcommand
-- Arguments naming the processing targets (file names, ...) go last
-
-Example:
-
-```
-app --verbose build --output dist/ src/
-```
-
-## OPTIONS: Option Form
-
-### Long form is the canonical name
-
-- Every option MUST have a long form (`--name`)
-- Long-form values are accepted both as `--output file.txt` and `--output=file.txt`
-- Option names use lowercase letters and hyphens only (e.g., `--dry-run`) — no underscores, no uppercase
-
-### Short forms only for frequent options
-
-- Provide a short form (`-o`, ...) only for options used routinely
-- A short form is one `-` plus one letter
-- Valueless short forms can be bundled (`-abc`)
-- Short-form values are accepted as `-o file.txt`
-
-### Argument separator
-
-- Everything after `--` is treated as arguments; no option parsing beyond it
-
-```
-app build -- --strange-filename
-```
-
-## RESERVED: Reserved Options
-
-The table below is a name reservation, not an implementation demand: **when the feature
-exists, it uses this name and short form**. Only `--version`/`-V` is mandatory.
-
-| Long form | Short | Behavior | Implementation |
+| Long form | Short | Behavior | Requirement |
 |---|---|---|---|
-| `--help` | `-h` | Print help and exit | Only with a help feature (recommended) |
-| `--version` | `-V` | Print the version and exit | Mandatory |
-| `--verbose` | `-v` | Enable detailed output | Only with a verbose-output feature |
-| `--quiet` | `-q` | Suppress all output except warnings | Only with an output-suppression feature |
+| `--version` | `-V` | Print the application version and exit | Mandatory |
+| `--help` | `-h` | Print help and exit | Mandatory when help is provided (providing help itself is recommended) |
+| `--verbose` | `-v` | Enable detailed output | Only with verbose-output feature |
+| `--quiet` | `-q` | Suppress non-warning output | Only with output-suppression feature |
 
-- `-v` is reserved for verbose; version uses uppercase `-V`
-- When both `--verbose` and `--quiet` are implemented and given together, the later one wins
+- **Preserve `-v` / `-V` distinction**: reserve `-v` exclusively for verbose output and `-V` exclusively for version output, preventing cross-tool muscle-memory errors when checking versions.
+- **Last flag wins between `--verbose` and `--quiet`**: when both options exist and appear on the same invocation, apply whichever appeared last on the command line, allowing callers to override preset flags in shell aliases or wrapper scripts.
 
-### Conventional names for common features
+### Conventional Feature Options
 
-When implementing one of these features, use the conventional name — never invent a new
-one:
+When implementing any feature below, use its conventional option name rather than inventing synonyms:
 
 | Option | Purpose |
 |---|---|
 | `--output <path>` / `-o` | Output destination |
-| `--config <path>` / `-c` | Configuration file |
-| `--force` / `-f` | Skip confirmation |
-| `--dry-run` | Show what would happen without changing anything |
-| `--format <name>` | Output format (`json`, `text`, ...) |
-| `--no-color` | Disable colored output |
+| `--config <path>` / `-c` | Configuration file path |
+| `--force` / `-f` | Skip interactive confirmation |
+| `--dry-run` | Preview actions without altering durable state |
+| `--format <name>` | Select output representation (`json`, `text`, ...) |
+| `--no-color` | Disable colored terminal output |
 
-## VERSIONOUT: Version Output
+## Version Output
 
-- `--version` prints a single line: the application's name, a space, and the product version — `MyApp 1.22.3`. When the command name differs from the application name, the application name is printed — the same name a GUI would display (Version Display in `standard.md`)
-- Default format is the bare product version only: no build hash, build date, commit id, or other metadata
-- The value comes from the project's single version definition (see the language file's version-management rules, e.g., `dotnet.md` VERSION), never from a hardcoded string
-- This is the CLI shape of the Version Display rule in `standard.md`; GUI display requirements are stated there
+- **Print the version and exit**: `--version` and `-V` print the application's version to standard output and exit 0 (specializing where the version appears under `standard.md` Version Display for CLI applications, so callers and scripts can query a tool's version uniformly without executing work).
 
-## SUBCOMMANDS: Subcommands
+## Subcommands
 
-### When to use them
+- **Use subcommands only for distinct operations**: split into subcommands when the application performs multiple independent operations; keep single-operation CLIs flat without subcommands, avoiding redundant wrapper verbs on single-purpose tools.
+- **Shallow verb or target-noun hierarchy**: name subcommands in lowercase as verbs (e.g., `build`, `show`, `set`) or target nouns (e.g., `config`), nested at most two levels deep (e.g., `app config set`), keeping command paths predictable and discoverable without deep command trees.
+- **Uniform naming across subcommands**: use consistent verbs for CRUD operations across the CLI (e.g., `list`, `show`, `set`/`add`, `remove`), and use identical option names for identical meanings across every subcommand (never `--output` on one subcommand and `--out` on another), so callers do not have to memorize per-subcommand synonyms.
 
-- Split into subcommands when the application has several independent operations
-- A small CLI with a single operation gets no subcommands
-- Subcommand names are verbs (`build`, `show`, `set`) or target nouns (`config`), nested at most two levels (e.g., `app config set`)
+## Help Output
 
-### Naming and consistency
+Applies when help is implemented, except the zero-argument rule, which applies to every CLI.
 
-- Subcommand names are lowercase only
-- An option meaning the same thing has the same name and role across all subcommands (if one command uses `--output`, another never uses `--out` for it)
-- CRUD-like operations are uniformly `list` / `show` / `set` (or `add`) / `remove`
+- **Per-level help**: support `--help` at the root and at every subcommand level (`app --help`, `app config --help`, `app config set --help`).
+- **Required help content**: include (1) a one-line summary, (2) a usage syntax line (e.g., `Usage: app [options] <target>`), (3) the subcommand list when subcommands exist, (4) option short/long forms with descriptions, and (5) representative examples whenever examples convey more than the usage line alone.
+- **Meaningless zero-argument invocation**: when invoking the CLI with no arguments performs no valid default behavior (unlike a GUI application launching its window), print only the brief usage syntax line plus a pointer to `--help` (when implemented) on standard error — omitting the `<app>: <message>` error prefix (`Error Messages` below) because the usage synopsis itself already names the command — and exit with code 2, rather than printing full help, avoiding flooding the terminal with full help text on a mis-invocation while still signaling a usage error to callers.
 
-## HELP: Help Output
+## Standard Streams
 
-This section applies when `--help` is implemented (RESERVED: recommended, not
-mandatory).
+- **Separate data from diagnostics**: write primary machine- or user-consumable results exclusively to standard output, and write logs, progress indicators, warnings, and errors exclusively to standard error.
+- **Clean structured output**: when `--format json` (or another machine-readable structured format) is selected, emit nothing on standard output outside that valid structured payload.
 
-### Per-level `--help`
-
-`--help` works at every level:
-
-```
-app --help              # overall summary and subcommand list
-app config --help       # config description and its subcommand list
-app config set --help   # usage of config set
-```
-
-### Help content
-
-The `--help` output contains:
-
-1. A one-line summary
-2. Usage (`Usage: app <command> [options]`)
-3. The subcommand list (when subcommands exist)
-4. The option list (short form, long form, description)
-5. Representative usage examples (when an example shows more than the usage line already does — a leaf command with no arguments or options needs none)
-
-### Behavior without arguments
-
-- When running with no arguments has no meaningful behavior, print a brief usage and exit with code 2
-- Not the full help: only the `Usage:` line plus, when `--help` is implemented, a "see `--help`" pointer
-
-## STREAMS: Standard Output and Standard Error
-
-- Results (the actual output) go to standard output
-- Logs, progress, warnings, and errors go to standard error
-- When `--format json` is implemented, standard output carries nothing but the JSON
-
-## EXITCODES: Exit Codes
-
-Whatever calls the command — a shell script, a scheduler, another program — branches on
-the exit code. Unless the meanings are fixed, every command invents its own and no caller
-can be written without reading each one's source.
+## Exit Codes
 
 | Code | Meaning |
 |---|---|
-| 0 | Success |
-| 1 | Runtime error (the operation failed) |
-| 2 | Usage error (invalid option or argument) |
+| 0 | Complete success (every requested item succeeded) |
+| 1 | Runtime error (an operation failed) |
+| 2 | Usage error (invalid option, missing argument, or invalid invocation syntax) |
 
-- When codes 3 and above are used for application-specific error classes, document them in the help or the documentation
+- **No silent partial success on exit 0**: exit 0 only when the entire requested operation succeeded; partial completion (e.g., skipped or failed items) exits 1 or a documented code 3 or higher.
+- **Document custom exit codes**: whenever exit codes 3 or higher are used, document each code in `--help` or application documentation.
 
-## ERRORMSG: Error Messages
+## Error Messages
 
-- Errors go to standard error in the form `app: <message>`
-- On an invalid option, print the error and, when `--help` is implemented, a `--help` pointer:
+- **Consistent error prefix**: write CLI errors to standard error prefixed with `<app>: <message>` so callers, shell pipelines, and CI logs can identify which command emitted each diagnostic line when multiple tools run together.
+- **Usage error hint**: on invalid options or syntax errors, follow the error line with a pointer to `--help` (e.g., `Try 'app --help' for more information.`) when help is implemented so callers can immediately discover valid syntax; suggesting the closest matching flag is encouraged though optional.
 
-```
-app: unknown option '--outpt'
-Try 'app --help' for more information.
-```
+## CLI Configuration Precedence
 
-- Where possible, suggest the correct candidate (`did you mean '--output'?`)
+- **Strict source precedence**: resolve overlapping settings in descending precedence: command-line options > environment variables > configuration files > built-in defaults (refining `configuration.md` when present).
+- **Consistent environment variable names**: when the CLI defines application-specific environment variables (not required unless the application supports environment-variable configuration), derive names from an uppercased application prefix followed by upper snake case (e.g., `APP_OUTPUT`, allowing framework section delimiters such as `__` where required) and document the mapping to CLI options in help or documentation — prefixing avoids variable collisions with other tools in the process environment, and upper snake case stays portable across POSIX and Windows shells (established cross-tool conventions such as `NO_COLOR` remain unprefixed).
 
-## CONFIG: Configuration and Environment Variables
+## Compatibility
 
-Precedence, strongest first:
-
-1. Command-line options
-2. Environment variables
-3. Configuration file
-4. Built-in defaults
-
-- Environment variable names are the `APP_` prefix (the uppercased application name) plus upper snake case (e.g., `APP_OUTPUT`)
-- When environment variables are implemented, the help documents which option each one corresponds to
-
-## COMPAT: Compatibility
-
-- Avoid incompatible changes to published option names, subcommand names, and exit-code meanings
-- When a rename is warranted, replace the old name outright — no deprecation period, no warning phase, no old-name alias. An alias doubles the surface that has to keep working, and leaves the help unable to say which name is the current one
-- To guarantee machine-readable output, provide `--format json` and state that the plain-text output's stability is not guaranteed
-
-## Checklist
-
-Before publishing a new CLI, confirm:
-
-- [ ] `--version` / `-V` works (and `--help` / `-h`, when implemented)
-- [ ] `--version` prints `<AppName> X.Y.Z` with no build metadata
-- [ ] Every option has a long form
-- [ ] Everything after `--` is treated as arguments
-- [ ] `--help`, when implemented, works under each subcommand
-- [ ] Same-named options mean the same thing across all subcommands
-- [ ] Results go to stdout; logs and errors go to stderr
-- [ ] Exit codes follow the 0 / 1 / 2 contract
-- [ ] An invalid option produces a usage error (exit code 2)
+- **Replace renames cleanly**: renaming a published option or subcommand, or changing an exit-code meaning, breaks the scripts that call it, so do so only when unavoidable; when an option or subcommand must be renamed, accept that break and replace the old name outright rather than maintaining compatibility aliases that inflate tests and clutter help (overriding the general external compatibility exception in `standard.md` Leave No Vestiges).
+- **Machine-readable stability contract**: guarantee stable output structure only under explicit structured formats such as `--format json`; treat human-oriented plain-text output as non-contractual.

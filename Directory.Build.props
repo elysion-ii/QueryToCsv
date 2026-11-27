@@ -5,7 +5,7 @@
     <!-- Single source of truth for the app version. Do not define <Version>
          anywhere else; Installer.ps1 reads this value and injects it into the
          Inno Setup script, and checks CHANGELOG.md (if present) for an entry. -->
-    <Version>3.0.0</Version>
+    <Version>4.0.0</Version>
 
     <!-- Keep AssemblyInformationalVersion equal to <Version>: the SDK otherwise
          appends "+<git sha>", and the displayed version must stay "AppName X.Y.Z"
@@ -33,9 +33,16 @@
     <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.*" PrivateAssets="all" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- BannedSymbols.txt lists the APIs no code may call; every use is RS0030, a
+         build error (see docs/rules/dotnet.md, ANALYZERS). -->
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.*" PrivateAssets="all" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
+  </ItemGroup>
+
   <!-- The packaging step ships the whole publish directory, and DebugType=none covers
        only this build's own symbols — a native package carries its own beside its
-       library (see docs/rules/dotnet.md, NATIVEDEP). -->
+       library (see docs/rules/dotnet-client.md, NATIVEDEP). -->
   <Target Name="RemoveSymbolsFromPublish"
           AfterTargets="ComputeResolvedFilesToPublishList">
     <ItemGroup>
@@ -47,10 +54,10 @@
   <!-- A single file that unpacks itself at run time is prohibited: it writes a
        per-build directory under the temp folder that nothing ever deletes. Both
        the project and a framework can turn this on, so the guard checks the
-       resolved values (see docs/rules/dotnet.md, NATIVEDEP). -->
+       resolved values (see docs/rules/dotnet-client.md, NATIVEDEP). -->
   <Target Name="ForbidSelfExtractingPublish"
           BeforeTargets="GenerateSingleFileBundle"
           Condition="'$(IncludeNativeLibrariesForSelfExtract)' == 'true' Or '$(IncludeAllContentForSelfExtract)' == 'true'">
-    <Error Text="This single-file publish would unpack itself into the temp folder on every new build, and nothing deletes what it leaves there. IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract), IncludeAllContentForSelfExtract=$(IncludeAllContentForSelfExtract). Remove whichever the project sets; where a framework sets it (WinUI 3 does), stop publishing that project as a single file (see docs/rules/dotnet.md, NATIVEDEP)." />
+    <Error Text="This single-file publish would unpack itself into the temp folder on every new build, and nothing deletes what it leaves there. IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract), IncludeAllContentForSelfExtract=$(IncludeAllContentForSelfExtract). Remove whichever the project sets; where a framework sets it (WinUI 3 does), stop publishing that project as a single file (see docs/rules/dotnet-client.md, NATIVEDEP)." />
   </Target>
 </Project>

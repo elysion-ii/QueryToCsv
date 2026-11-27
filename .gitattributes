@@ -1,5 +1,9 @@
-# Default: normalize every text file in the index; rules below refine per type
-* text=auto
+# Default: normalize every text file in the index and check it out with LF on every
+# machine, whatever its core.autocrlf; rules below refine per type.
+# eol= here equals end_of_line under [*] in .editorconfig: dotnet format checks every
+# line ending against end_of_line, so a working tree checked out with the other line
+# ending fails the format gate in every file
+* text=auto eol=lf
 
 # Text files
 *.cs        text diff=csharp
@@ -17,12 +21,12 @@
 *.iss       text
 *.sql       text
 
-# Windows-specific scripts (CRLF)
+# Windows-specific scripts (CRLF); the same list sets end_of_line = crlf in .editorconfig
 *.bat       text eol=crlf
 *.cmd       text eol=crlf
 *.ps1       text eol=crlf
 
-# Unix scripts (LF)
+# Unix scripts stay LF even where the default above is switched to CRLF
 *.sh        text eol=lf
 
 # Binary

@@ -9,8 +9,10 @@ public class CliInvocationTests
         { [], "Interactive" },
         { ["-h"], "Help" },
         { ["--help"], "Help" },
+        { ["--help", "anything"], "Help" },
         { ["-V"], "Version" },
         { ["--version"], "Version" },
+        { ["-V", "--query"], "Version" },
         { ["--open", "queries"], "Open" },
         { ["--open=output"], "Open" },
         { ["--query", "SELECT 1"], "OneLiner" },
@@ -20,7 +22,10 @@ public class CliInvocationTests
     {
         { ["--open"], "option '--open' requires a value." },
         { ["--open="], "option '--open' requires a value." },
+        { ["--open", ""], "option '--open' requires a value." },
         { ["--open", "queries", "extra"], "unexpected argument 'extra'" },
+        { ["--open=queries", "extra"], "unexpected argument 'extra'" },
+        { ["--query", "SELECT 1", "--open", "log"], "unknown option '--open'" },
         { ["-v"], "unknown option '-v'" },
         { ["-q", "SELECT 1"], "unknown option '-q'" },
         { ["version"], "unknown option 'version'" },
@@ -30,14 +35,16 @@ public class CliInvocationTests
     {
         { ["--open", "queries"], "queries" },
         { ["--open=queries"], "queries" },
+        { ["--open", "QUERIES"], "QUERIES" },
         { ["--open=report.csv"], "report.csv" },
     };
 
     [Theory]
     [MemberData(nameof(Modes))]
-    public void Parse_KnownMode_ReturnsExpectedMode(string[] args, string expectedMode)
+    [Trait("Requirement", "QTC-1")]
+    internal void Parse_KnownMode_ReturnsExpectedMode(string[] args, string expectedMode)
     {
-        var (invocation, error) = CliInvocation.Parse(args);
+        (CliInvocation? invocation, string? error) = CliInvocation.Parse(args);
 
         Assert.Null(error);
         Assert.NotNull(invocation);
@@ -46,9 +53,10 @@ public class CliInvocationTests
 
     [Theory]
     [MemberData(nameof(OpenInvocations))]
-    public void Parse_OpenMode_ReturnsTarget(string[] args, string expectedTarget)
+    [Trait("Requirement", "QTC-4")]
+    internal void Parse_OpenMode_ReturnsTarget(string[] args, string expectedTarget)
     {
-        var (invocation, error) = CliInvocation.Parse(args);
+        (CliInvocation? invocation, string? error) = CliInvocation.Parse(args);
 
         Assert.Null(error);
         Assert.NotNull(invocation);
@@ -57,9 +65,11 @@ public class CliInvocationTests
 
     [Theory]
     [MemberData(nameof(RejectedInvocations))]
-    public void Parse_InvalidInvocation_ReturnsExpectedError(string[] args, string expectedError)
+    [Trait("Requirement", "QTC-1")]
+    [Trait("Requirement", "QTC-4")]
+    internal void Parse_InvalidInvocation_ReturnsExpectedError(string[] args, string expectedError)
     {
-        var (invocation, error) = CliInvocation.Parse(args);
+        (CliInvocation? invocation, string? error) = CliInvocation.Parse(args);
 
         Assert.Null(invocation);
         Assert.Equal(expectedError, error);

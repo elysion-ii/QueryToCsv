@@ -8,7 +8,23 @@ permissions:
   contents: write
 
 jobs:
+  # Boundary tests start a Linux SQL Server container, which Windows runners cannot run,
+  # so they run here on the tagged commit before anything is built.
+  boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Boundary tests
+        run: dotnet test QueryToCsv.Tests/QueryToCsv.Tests.csproj -c Release --filter "Category=Boundary"
+
   release:
+    needs: boundary
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,14 +32,13 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
-          dotnet-quality: 'preview'
+          global-json-file: global.json
 
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 
       - name: Build EXE
-        run: pwsh build/Build.ps1
+        run: pwsh build/Build.ps1 -SkipBoundaryTests
 
       - name: Build Installer
         run: pwsh build/Installer.ps1
